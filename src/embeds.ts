@@ -11,26 +11,25 @@ export function codeToFlag(code: string | null | undefined): string {
 
 export function roundEmbed(info: RoundStartedInfo): EmbedBuilder {
   const answerType = info.mode === 'subdivision' ? 'subdivision' : 'country';
+  const guessExample = info.mode === 'subdivision' ? '<subdivision>' : '<country>';
+  const randomExample = info.mode === 'subdivision' ? '<s1> or <s2>' : '<c1> or <c2>';
   return new EmbedBuilder()
     .setTitle(`🌍 ${info.mapName}`)
     .setDescription(
-      `### Round ${info.roundNumber}\n` +
-        `**Streak:** \`${info.streak}\`\n\n` +
+      `**Streak:** \`${info.streak}\`\n\n` +
         `**Vote** for the ${answerType}\n` +
-        `> \`!g <country>\`\n` +
-        `> \`!g <c1> or <c2>\` — random pick\n\n` +
+        `> \`!g ${guessExample}\`\n` +
+        `> \`!g ${randomExample}\` — random pick\n\n` +
         `⏱️ \`!time\` — extend  ·  🖼️ \`!image\` — re-show`,
     )
-    .setColor(0x3498db)
-    .setImage('attachment://round.jpg');
+      .setColor(0x3498db);
 }
 
 export function resultEmbed(info: RoundResolvedInfo): EmbedBuilder {
   const embed = new EmbedBuilder();
-  const flag = codeToFlag(info.actualCountryCode ?? info.actualCode);
   const answer = info.mode === 'subdivision'
-    ? `${flag} **${info.actualCountryName ?? 'Unknown country'}** · **${info.actualName ?? 'Unknown subdivision'}**`
-    : `${flag} **${info.actualName ?? 'Unknown'}**`;
+    ? `**${info.actualName ?? 'Unknown subdivision'}**`
+    : `${codeToFlag(info.actualCountryCode ?? info.actualCode)} **${info.actualName ?? 'Unknown'}**`;
 
   if (info.skipped) {
     embed.setTitle('⏭️ Round skipped').setColor(0x95a5a6);
@@ -43,18 +42,15 @@ export function resultEmbed(info: RoundResolvedInfo): EmbedBuilder {
     .setTitle(info.isCorrect ? `✅ ${answer}` : `❌ ${answer}`)
     .setColor(info.isCorrect ? 0x2ecc71 : 0xe74c3c);
 
-  // Location line
   const lines: string[] = [];
   if (info.mode === 'subdivision') {
-    if (info.actualCountryName) lines.push(`🌍 **Country:** ${info.actualCountryName}`);
-    lines.push(`📍 **Subdivision:** ${info.actualName ?? 'Unknown'}`);
+    if (info.actualSubdivisionDetail) lines.push(`📌 **Area:** ${info.actualSubdivisionDetail}`);
   } else if (info.actualSubdivision) {
     lines.push(`📍 *Subdivision: ${info.actualSubdivision}*`);
   }
 
   // Outcome line
   if (info.isCorrect) {
-    lines.push(`Correct — the streak is now **${info.streak}**.`);
   } else {
     lines.push(`The vote was **${info.winningName}**.`);
     if (info.endedStreak > 0) lines.push(`💔 Streak ended at **${info.endedStreak}**.`);
@@ -63,11 +59,11 @@ export function resultEmbed(info: RoundResolvedInfo): EmbedBuilder {
     const distance = info.hedgeDistanceMeters < 1000
       ? `${Math.round(info.hedgeDistanceMeters)} m`
       : `${(info.hedgeDistanceMeters / 1000).toFixed(1)} km`;
-    lines.push(`📍 \`/w\` distance: **${distance}**${info.hedgeDistanceMeters <= 185 ? ' · 🎯 **5K**' : ''}`);
+    lines.push(`Distance: **${distance}**${info.hedgeDistanceMeters <= 185 ? ' · 🎯 **5K**' : ''}`);
   }
 
   // Votes
-  if (info.tally.length > 0) {
+  if (info.tally.length > 1) {
     lines.push('');
     lines.push('**Votes**');
     for (const t of info.tally) {
@@ -84,12 +80,13 @@ export function resultEmbed(info: RoundResolvedInfo): EmbedBuilder {
 
   // XP awards
   if (info.awards.size > 0) {
-    const awardText = [...info.awards].map(([userId, xp]) => `<@${userId}> \`+${xp}\``).join('  ');
+    const awardText = [...info.awards].map(([userId, xp]) => `<@${userId}> \`+${xp} XP\``).join('  ');
     lines.push('');
     lines.push(awardText);
   }
 
   embed.setDescription(lines.join('\n'));
+  if (info.hedgeMap) embed.setImage('attachment://hedge-map.png');
   if (info.mapsLink) embed.setURL(info.mapsLink);
   return embed;
 }
@@ -100,6 +97,7 @@ export function hedgeGuessEmbed(info: {
   actualCountryCode: string | null;
   actualCountryName: string | null;
   actualSubdivision: string | null;
+  actualSubdivisionDetail?: string | null;
 }): EmbedBuilder {
   const country = `${codeToFlag(info.actualCountryCode)} **${info.actualCountryName ?? 'Unknown'}**`;
   const lines = [

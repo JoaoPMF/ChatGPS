@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { findMap } from '../src/config.js';
 import { nameOf, normalize, resolveCountry, sovereignOf } from '../src/countries.js';
 import { resolveSubdivision } from '../src/data/subdivisions.js';
 
@@ -93,8 +94,10 @@ describe('subdivision names and aliases', () => {
     expect(resolveSubdivision('PT', 'li')?.name).toBe('Lisbon');
     expect(resolveSubdivision('PT', 'leiria')?.name).toBe('Leiria');
     expect(resolveSubdivision('PT', 'vdc')?.name).toBe('Viana do Castelo');
+    expect(resolveSubdivision('PT', 'viana')?.name).toBe('Viana do Castelo');
     expect(resolveSubdivision('PT', 'madeira')?.name).toBe('Madeira');
     expect(resolveSubdivision('PT', 'ma')?.name).toBe('Madeira');
+    expect(resolveSubdivision('PT', 'ronaldo')?.name).toBe('Madeira');
     expect(resolveSubdivision('PT', 'região autónoma da madeira')?.name).toBe('Madeira');
     expect(resolveSubdivision('PT', 'PT-30')?.name).toBe('Madeira');
   });
@@ -124,5 +127,12 @@ describe('subdivision names and aliases', () => {
     ['PE', 'mml', 'Lima hatun llaqta'],
   ])('loads subdivision data for %s', (countryCode, subdivision, expectedName) => {
     expect(resolveSubdivision(countryCode, subdivision)?.name).toBe(expectedName);
+  });
+});
+
+describe('findMap', () => {
+  it('resolves country aliases to their registered subdivision maps', () => {
+    expect(findMap('bra')?.countryCode).toBe('BR');
+    expect(findMap('aus')?.countryCode).toBe('AU');
   });
 });

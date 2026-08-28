@@ -13,14 +13,8 @@ import { BASE_FOV, renderRoundView } from './projection.js';
 function makeChannelEvents(channel: SendableChannels): SessionEvents {
   return {
     roundStarted: async (info) => {
-      if (info.image) {
-        await channel.send({
-          embeds: [roundEmbed(info)],
-          files: [new AttachmentBuilder(info.image, { name: 'round.jpg' })],
-        });
-      } else {
-        await channel.send({ embeds: [roundEmbed(info)] });
-      }
+      await channel.send({ embeds: [roundEmbed(info)] });
+      if (info.image) await channel.send({ files: [new AttachmentBuilder(info.image, { name: 'round.jpg' })] });
     },
     voteAccepted: async (info) => {
       if (info.firstVote && info.deadline !== null) {
@@ -47,7 +41,10 @@ function makeChannelEvents(channel: SendableChannels): SessionEvents {
       );
     },
     roundResolved: async (info) => {
-      await channel.send({ embeds: [resultEmbed(info)] });
+      await channel.send({
+        embeds: [resultEmbed(info)],
+        files: info.hedgeMap ? [new AttachmentBuilder(info.hedgeMap, { name: 'hedge-map.png' })] : [],
+      });
     },
     error: async (info) => {
       await channel.send(`⚠️ ${info.message}`);
@@ -143,7 +140,6 @@ async function main(): Promise<void> {
               : 'There is no active round.';
           await message.reply(`📍 ${text}`);
         } else {
-          // The normal roundResolved event now posts the result embed, including the distance.
           await message.react(result.isFiveK ? '🎯' : '✅').catch(() => {});
         }
         return;

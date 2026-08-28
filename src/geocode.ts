@@ -9,6 +9,8 @@ export interface GeoResult {
   subdivision: string | null;
   /** Full ISO 3166-2 code, for example US-CA or PT-11. */
   subdivisionCode?: string | null;
+  /** Most specific available administrative area within the principal subdivision. */
+  subdivisionDetail?: string | null;
 }
 
 export interface IGeocoder {
@@ -46,6 +48,10 @@ export class Geocoder implements IGeocoder {
       typeof entry?.isoCode === 'string' && entry.isoCode.toUpperCase().startsWith(`${sovereign}-`),
     )?.isoCode;
     const subdivisionCode: string | null = data?.principalSubdivisionCode || fallbackCode || null;
-    return { code: sovereign, name, subdivision, subdivisionCode };
+    const subdivisionDetail = administrative
+      .filter((entry: any) => typeof entry?.name === 'string' && entry.name !== subdivision &&
+        !(typeof entry?.isoCode === 'string' && entry.isoCode.toUpperCase().startsWith(`${sovereign}-`)))
+      .sort((first: any, second: any) => (second.adminLevel ?? 0) - (first.adminLevel ?? 0))[0]?.name ?? null;
+    return { code: sovereign, name, subdivision, subdivisionCode, subdivisionDetail };
   }
 }

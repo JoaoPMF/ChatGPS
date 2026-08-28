@@ -13,6 +13,13 @@ describe('parseCoordinates', () => {
     });
   });
 
+  it('parses coordinates pasted from ChatGuessr', () => {
+    expect(parseCoordinates('PlonkIt !g 55.35125630297167, 78.57267379760742')).toEqual({
+      lat: 55.35125630297167,
+      lng: 78.57267379760742,
+    });
+  });
+
   it('rejects invalid coordinates', () => {
     expect(parseCoordinates('not coordinates')).toBeNull();
     expect(parseCoordinates('95, 10')).toBeNull();

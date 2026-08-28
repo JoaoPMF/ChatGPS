@@ -233,7 +233,7 @@ export class BotDb {
          JOIN rounds r ON r.id = ur.round_id
          WHERE ur.user_id = ?
          GROUP BY r.map_id, r.map_name
-         ORDER BY total DESC`,
+         ORDER BY acc DESC, total DESC, r.map_name ASC`,
       )
       .all(userId) as { mapName: string | null; total: number; correct: number; acc: number }[];
   }
@@ -249,7 +249,7 @@ export class BotDb {
          JOIN rounds r ON r.id = ur.round_id
          WHERE ur.user_id = ? AND r.map_id = ? AND r.actual_name IS NOT NULL
          GROUP BY r.actual_code, r.actual_name
-         ORDER BY total DESC, subdivision ASC`,
+         ORDER BY acc DESC, total DESC, subdivision ASC`,
       )
       .all(userId, mapId) as { subdivision: string; total: number; correct: number; acc: number }[];
   }

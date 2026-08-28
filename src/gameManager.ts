@@ -13,6 +13,7 @@ import {
 import { chooseFromInput, pickWinner, tallyVotes, type CastVote, type WinnerInfo } from './votes.js';
 import { computeXpAwards } from './xp.js';
 import { distanceMeters, parseCoordinates } from './hedge.js';
+import { renderHedgeMap } from './hedgeMap.js';
 
 export type Phase = 'loading' | 'open' | 'resolving';
 
@@ -52,6 +53,7 @@ export interface RoundResolvedInfo {
   actualCountryName: string | null;
   actualCountryCode: string | null;
   actualSubdivision: string | null;
+  actualSubdivisionDetail: string | null;
   winningName: string | null;
   tally: WinnerInfo[];
   /** Streak after this round. */
@@ -63,6 +65,8 @@ export interface RoundResolvedInfo {
   mapsLink: string | null;
   /** Distance for an instant /w guess, when this round was resolved by /w. */
   hedgeDistanceMeters?: number;
+  /** Map image comparing a successful hedge guess to the actual round location. */
+  hedgeMap?: Buffer;
 }
 
 export interface SessionEvents {
@@ -103,6 +107,8 @@ export type HedgeGuessResult =
       distanceMeters: number;
       lat: number;
       lng: number;
+      actualLat: number;
+      actualLng: number;
       isFiveK: boolean;
       actualCountryCode: string | null;
       actualCountryName: string | null;
@@ -126,6 +132,7 @@ export class GameSession {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private deadline: number | null = null;
   private hedgeDistanceForResult: number | null = null;
+  private hedgeMapForResult: Buffer | null = null;
   private extensionsUsed = 0;
   private streakId: number | null = null;
   private actualPromise: Promise<GeoResult | null> | null = null;
@@ -192,6 +199,7 @@ export class GameSession {
     this.extensionsUsed = 0;
     this.deadline = null;
     this.hedgeDistanceForResult = null;
+    this.hedgeMapForResult = null;
     this.roundNumber++;
     this.phase = 'open';
 
@@ -295,6 +303,7 @@ export class GameSession {
     if (this.hedgeGuesses.has(userId)) return { ok: false, reason: 'already-guessed' };
     const guess = parseCoordinates(input);
     if (!guess) return { ok: false, reason: 'invalid-coordinates' };
+    const actualPosition = { lat: this.current.lat, lng: this.current.lng };
 
     const distance = distanceMeters(guess, { lat: this.current.lat, lng: this.current.lng });
     const isFiveK = distance <= CONFIG.fiveKDistanceMeters;
@@ -302,7 +311,7 @@ export class GameSession {
     if (!guessedLocation) return { ok: false, reason: 'unrecognized-location' };
 
     const voteInput = this.mode === 'subdivision'
-      ? guessedLocation.subdivision ?? ''
+      ? guessedLocation.subdivisionCode ?? guessedLocation.subdivision ?? ''
       : `${guessedLocation.name}${guessedLocation.subdivision ? `, ${guessedLocation.subdivision}` : ''}`;
     if (!voteInput) return { ok: false, reason: 'unrecognized-location' };
 
@@ -313,6 +322,7 @@ export class GameSession {
 
     this.hedgeGuesses.add(userId);
     this.hedgeDistanceForResult = distance;
+    this.hedgeMapForResult = await renderHedgeMap(guess, actualPosition).catch(() => null);
     const actual = this.actualPromise ? await this.actualPromise : null;
     this.deps.db.recordHedgeGuess({
       channelId: this.deps.channelId,
@@ -330,6 +340,8 @@ export class GameSession {
       distanceMeters: distance,
       lat: guess.lat,
       lng: guess.lng,
+      actualLat: actualPosition.lat,
+      actualLng: actualPosition.lng,
       isFiveK,
       actualCountryCode: actual?.code ?? null,
       actualCountryName: actual?.name ?? null,
@@ -467,6 +479,7 @@ export class GameSession {
       actualCountryName: actual?.name ?? null,
       actualCountryCode: actual?.code ?? null,
       actualSubdivision: actual?.subdivision ?? null,
+      actualSubdivisionDetail: actual?.subdivisionDetail ?? null,
       winningName: winner.name,
       tally,
       streak: this.streak,
@@ -475,9 +488,11 @@ export class GameSession {
       awards,
       mapsLink: roundMapsLink(this.current),
       hedgeDistanceMeters: this.hedgeDistanceForResult ?? undefined,
+      hedgeMap: this.hedgeMapForResult ?? undefined,
     });
 
     this.hedgeDistanceForResult = null;
+    this.hedgeMapForResult = null;
     await this.advance();
   }
 
@@ -512,6 +527,7 @@ export class GameSession {
       actualCountryName: actual?.name ?? null,
       actualCountryCode: actual?.code ?? null,
       actualSubdivision: actual?.subdivision ?? null,
+      actualSubdivisionDetail: actual?.subdivisionDetail ?? null,
       winningName: null,
       tally: [],
       streak: 0,

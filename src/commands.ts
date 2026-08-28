@@ -1,4 +1,4 @@
-import { AttachmentBuilder, type Message } from 'discord.js';
+import { AttachmentBuilder, MessageFlags, type Message } from 'discord.js';
 import { CONFIG, env, findMap, MAPS } from './config.js';
 import type { BotDb } from './db.js';
 import { codeToFlag, leaderboardEmbed, mapListEmbed, xpEmbed } from './embeds.js';
@@ -259,8 +259,11 @@ export function buildCommands(): Map<string, Command> {
   const mapLink: Command = {
     handler: async (message) => {
       await message.reply(
-        '🗺️ **ChatGuessr map**\n' + env.chatguessrMapUrl +
-          '\n\nUse `/w <latitude>, <longitude>` to submit your guess.',
+        {
+          content: '🗺️ **ChatGuessr map**\n' + env.chatguessrMapUrl +
+            '\n\nUse `/w <latitude>, <longitude>` to submit your guess.',
+          flags: MessageFlags.SuppressEmbeds,
+        },
       );
     },
   };
@@ -439,8 +442,8 @@ export function buildCommands(): Map<string, Command> {
           '**Jogo**',
           '`!g <país>` — Vota num país (podes mudar enquanto o timer não acabar)',
           '`!g <país>, <subdivisão>` — País + subdivisão; subdivisão correta duplica o XP',
-          'Em mapas de país: `!g <subdivisão>` — Vota numa subdivisão',
-          '`!g <c1> or <c2>` — O bot escolhe aleatoriamente um dos países',
+          'Em mapas de subdivisões: `!g <subdivisão>` — Vota numa subdivisão',
+          '`!g <c1> or <c2>` — O bot escolhe aleatoriamente uma das opções',
           '`!g cancel` — Cancela o teu voto',
           '`!image` / `!pic` — Mostra a localização atual  ·  `!!pic` — Reconstrói a imagem',
           '`!time` — Estende a votação em 20s (máx. 3×)',

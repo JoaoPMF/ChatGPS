@@ -12,10 +12,10 @@ describe('BotDb accuracy', () => {
       roundNumber: 1,
       lat: 0,
       lng: 0,
-      actualCode: 'FR',
-      actualName: 'France',
-      winningCode: 'FR',
-      winningName: 'France',
+      actualCode: 'ZZ',
+      actualName: 'Zeta',
+      winningCode: 'ZZ',
+      winningName: 'Zeta',
       isCorrect: true,
     });
     const second = db.logRound({
@@ -26,10 +26,10 @@ describe('BotDb accuracy', () => {
       roundNumber: 2,
       lat: 0,
       lng: 0,
-      actualCode: 'DE',
-      actualName: 'Germany',
-      winningCode: 'DE',
-      winningName: 'Germany',
+      actualCode: 'AA',
+      actualName: 'Alpha',
+      winningCode: 'AA',
+      winningName: 'Alpha',
       isCorrect: true,
     });
     db.logUserRound(first, 'user', true);
@@ -39,8 +39,8 @@ describe('BotDb accuracy', () => {
       { mapName: 'Test Map', total: 2, correct: 1, acc: 50 },
     ]);
     expect(db.accuracyBySubdivision('user', 'map-1')).toEqual([
-      { subdivision: 'France', total: 1, correct: 1, acc: 100 },
-      { subdivision: 'Germany', total: 1, correct: 0, acc: 0 },
+      { subdivision: 'Zeta', total: 1, correct: 1, acc: 100 },
+      { subdivision: 'Alpha', total: 1, correct: 0, acc: 0 },
     ]);
     db.close();
   });

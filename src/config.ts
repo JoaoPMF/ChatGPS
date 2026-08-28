@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { resolveCountry } from './countries.js';
 
 export interface MapDef {
   id: string;
@@ -55,6 +56,8 @@ export function findMap(input: string): MapDef | null {
   for (const m of MAPS) {
     if (m.id.toLowerCase() === q || m.name.toLowerCase() === q || m.aliases.includes(q)) return m;
   }
+  const country = resolveCountry(q);
+  if (country) return MAPS.find((map) => map.countryCode === country.code) ?? null;
   if (/^[a-f0-9]{24}$/i.test(q)) return { id: q, name: q, aliases: [], mode: 'country' };
   return null;
 }
