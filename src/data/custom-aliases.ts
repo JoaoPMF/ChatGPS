@@ -19,6 +19,7 @@ export const COUNTRY_ALIASES: Record<string, string[]> = {
     AR: ['arg'],
     BR: ['bra'],
     CA: ['can'],
+    CL: ['chi'],
 };
 
 export const SUBDIVISION_ALIASES: Record<string, string[]> = {
