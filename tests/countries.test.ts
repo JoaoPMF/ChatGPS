@@ -90,14 +90,24 @@ describe('subdivision names and aliases', () => {
   it('accepts English and local names for Portuguese subdivisions', () => {
     expect(resolveSubdivision('PT', 'lisbon')?.name).toBe('Lisbon');
     expect(resolveSubdivision('PT', 'lisboa')?.name).toBe('Lisbon');
+    expect(resolveSubdivision('PT', 'li')?.name).toBe('Lisbon');
     expect(resolveSubdivision('PT', 'leiria')?.name).toBe('Leiria');
+    expect(resolveSubdivision('PT', 'vdc')?.name).toBe('Viana do Castelo');
     expect(resolveSubdivision('PT', 'madeira')?.name).toBe('Madeira');
+    expect(resolveSubdivision('PT', 'ma')?.name).toBe('Madeira');
     expect(resolveSubdivision('PT', 'região autónoma da madeira')?.name).toBe('Madeira');
     expect(resolveSubdivision('PT', 'PT-30')?.name).toBe('Madeira');
   });
 
   it('resolves subdivisions outside the dedicated subdivision maps', () => {
     expect(resolveSubdivision('MX', 'tamaulipas')?.code).toBe('TAM');
+  });
+
+  it.each([
+    ['AU', 'cx', 'CX'], ['CL', 'ñub', 'NB'], ['IN', 'dh', 'DH'], ['ID', 'pbd', 'PD'],
+    ['KZ', 'ul', 'ULY'], ['PH', 'neg', '18'], ['US', 'bye', 'HI'], ['RU', 'spb', 'SPE'],
+  ])('resolves requested aliases for %s', (countryCode, subdivision, expectedCode) => {
+    expect(resolveSubdivision(countryCode, subdivision)?.code).toBe(expectedCode);
   });
 
   it('uses current Greenland municipalities instead of legacy ISO data', () => {

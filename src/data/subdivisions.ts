@@ -63,6 +63,24 @@ const PORTUGUESE_ALIASES: Record<string, string[]> = {
   'PT-30': ['regiao autonoma da madeira', 'região autónoma da madeira', 'madeira'],
 };
 
+const EXTRA_SUBDIVISIONS: Record<string, Array<{ code: string; name: string }>> = {
+  AU: [
+    { code: 'CC', name: 'Cocos Islands' }, { code: 'CX', name: 'Christmas Island' },
+    { code: 'JBT', name: 'Jervis Bay Territory' },
+  ],
+  CL: [{ code: 'NB', name: 'Ñuble' }],
+  IN: [{ code: 'DH', name: 'Dadra and Nagar Haveli and Daman and Diu' }],
+  ID: [
+    { code: 'PD', name: 'Papua Barat Daya' }, { code: 'PE', name: 'Papua Pegunungan' },
+    { code: 'PS', name: 'Papua Selatan' }, { code: 'PT', name: 'Papua Tengah' },
+  ],
+  KZ: [
+    { code: 'ABA', name: 'Abai' }, { code: 'ZHE', name: 'Jetisu' }, { code: 'SHY', name: 'Shymkent' },
+    { code: 'TUR', name: 'Turkistan' }, { code: 'ULY', name: 'Ulytau' },
+  ],
+  PH: [{ code: '18', name: 'Negros Island Region' }],
+};
+
 const GREENLAND_SUBDIVISIONS: SubdivisionDef[] = [
   { code: 'AV', name: 'Avannaata', aliases: ['avannaata', 'avannaata kommunia'] },
   { code: 'KU', name: 'Kujalleq', aliases: ['kujalleq', 'kommune kujalleq'] },
@@ -110,9 +128,17 @@ function shortEnglishName(name: string): string | null {
 
 function makeCountry(countryCode: string): SubdivisionDef[] {
   const country = data[countryCode];
-  if (!country?.sub) return [];
+  const extras = EXTRA_SUBDIVISIONS[countryCode] ?? [];
+  if (!country?.sub) {
+    return extras.map(({ code, name }) => ({
+      code,
+      name,
+      aliases: [name, ...(SUBDIVISION_ALIASES[`${countryCode}-${code}`] ?? [])]
+        .map((alias) => stripDiacritics(alias).toLowerCase().trim()),
+    }));
+  }
 
-  return Object.entries(country.sub).map(([fullCode, subdivision]) => {
+  const subdivisions = Object.entries(country.sub).map(([fullCode, subdivision]) => {
     const code = fullCode.slice(countryCode.length + 1);
     const name = ENGLISH_NAMES[fullCode] ?? subdivision.name;
     const shortName = shortEnglishName(name);
@@ -126,6 +152,12 @@ function makeCountry(countryCode: string): SubdivisionDef[] {
     ].filter((alias): alias is string => Boolean(alias)).map((alias) => stripDiacritics(alias).toLowerCase().trim()).filter(Boolean))];
     return { code, name, aliases };
   });
+  return [...subdivisions, ...extras.map(({ code, name }) => ({
+    code,
+    name,
+    aliases: [...new Set([name, ...(SUBDIVISION_ALIASES[`${countryCode}-${code}`] ?? [])]
+      .map((alias) => stripDiacritics(alias).toLowerCase().trim()).filter(Boolean))],
+  }))];
 }
 
 /** Complete ISO 3166-2 first-level subdivision data for supported country maps. */
