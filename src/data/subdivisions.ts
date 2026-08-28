@@ -63,6 +63,34 @@ const PORTUGUESE_ALIASES: Record<string, string[]> = {
   'PT-30': ['regiao autonoma da madeira', 'região autónoma da madeira', 'madeira'],
 };
 
+const GREENLAND_SUBDIVISIONS: SubdivisionDef[] = [
+  { code: 'AV', name: 'Avannaata', aliases: ['avannaata', 'avannaata kommunia'] },
+  { code: 'KU', name: 'Kujalleq', aliases: ['kujalleq', 'kommune kujalleq'] },
+  { code: 'QE', name: 'Qeqqata', aliases: ['qeqqata', 'qeqqata kommunia'] },
+  { code: 'QT', name: 'Qeqertalik', aliases: ['qeqertalik', 'kommune qeqertalik'] },
+  { code: 'SM', name: 'Sermersooq', aliases: ['sermersooq', 'kommuneqarfik sermersooq'] },
+];
+
+const NORWAY_SUBDIVISIONS: SubdivisionDef[] = [
+  { code: '42', name: 'Agder', aliases: ['agder', 'ag'] },
+  { code: '32', name: 'Akershus', aliases: ['akershus', 'ak', 'ash', 'as'] },
+  { code: '33', name: 'Buskerud', aliases: ['buskerud', 'bus', 'bu'] },
+  { code: '56', name: 'Finnmark', aliases: ['finnmark', 'fi'] },
+  { code: '34', name: 'Innlandet', aliases: ['innlandet', 'inn', 'in', 'il'] },
+  { code: '22', name: 'Jan Mayen', aliases: ['jan mayen', 'jan', 'jm'] },
+  { code: '15', name: 'More og Romsdal', aliases: ['more og romsdal', 'møre og romsdal', 'mor', 'mo', 'mr'] },
+  { code: '18', name: 'Nordland', aliases: ['nordland', 'no', 'nl'] },
+  { code: '03', name: 'Oslo', aliases: ['oslo', 'os'] },
+  { code: '11', name: 'Rogaland', aliases: ['rogaland', 'ro', 'rl'] },
+  { code: '21', name: 'Svalbard', aliases: ['svalbard', 'sv', 'sp', 'sb'] },
+  { code: '40', name: 'Telemark', aliases: ['telemark', 'te'] },
+  { code: '55', name: 'Troms', aliases: ['troms', 'ts'] },
+  { code: '50', name: 'Trondelag', aliases: ['trondelag', 'trøndelag', 'tg'] },
+  { code: '38', name: 'Vestfold', aliases: ['vestfold', 'vf'] },
+  { code: '46', name: 'Vestland', aliases: ['vestland', 've', 'vl'] },
+  { code: '31', name: 'Ostfold', aliases: ['ostfold', 'østfold', 'øst', 'ost', 'øf', 'of'] },
+];
+
 function stripDiacritics(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
@@ -102,6 +130,7 @@ function makeCountry(countryCode: string): SubdivisionDef[] {
 
 /** Complete ISO 3166-2 first-level subdivision data for supported country maps. */
 export const SUBDIVISIONS: Record<string, SubdivisionDef[]> = {
+  AT: makeCountry('AT'),
   PT: makeCountry('PT'),
   AR: makeCountry('AR'),
   AU: makeCountry('AU'),
@@ -109,10 +138,15 @@ export const SUBDIVISIONS: Record<string, SubdivisionDef[]> = {
   CA: makeCountry('CA'),
   CL: makeCountry('CL'),
   CO: makeCountry('CO'),
+  GL: GREENLAND_SUBDIVISIONS,
+  GR: makeCountry('GR'),
   IN: makeCountry('IN'),
   ID: makeCountry('ID'),
+  IT: makeCountry('IT'),
   JP: makeCountry('JP'),
   KZ: makeCountry('KZ'),
+  NO: NORWAY_SUBDIVISIONS,
+  PE: makeCountry('PE'),
   PH: makeCountry('PH'),
   RU: makeCountry('RU'),
   ZA: makeCountry('ZA'),

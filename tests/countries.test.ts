@@ -99,4 +99,20 @@ describe('subdivision names and aliases', () => {
   it('resolves subdivisions outside the dedicated subdivision maps', () => {
     expect(resolveSubdivision('MX', 'tamaulipas')?.code).toBe('TAM');
   });
+
+  it('uses current Greenland municipalities instead of legacy ISO data', () => {
+    expect(resolveSubdivision('GL', 'kommune qeqertalik')?.name).toBe('Qeqertalik');
+    expect(resolveSubdivision('GL', 'GL-QT')?.name).toBe('Qeqertalik');
+    expect(resolveSubdivision('GL', 'avannaata kommunia')?.name).toBe('Avannaata');
+  });
+
+  it.each([
+    ['AT', 'bgl', 'Burgenland'],
+    ['GR', 'emt', 'Anatolikí Makedonía kai Thráki'],
+    ['IT', 'π', 'Piemonte'],
+    ['NO', 'øst', 'Ostfold'],
+    ['PE', 'mml', 'Lima hatun llaqta'],
+  ])('loads subdivision data for %s', (countryCode, subdivision, expectedName) => {
+    expect(resolveSubdivision(countryCode, subdivision)?.name).toBe(expectedName);
+  });
 });

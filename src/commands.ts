@@ -2,7 +2,7 @@ import { AttachmentBuilder, type Message } from 'discord.js';
 import { CONFIG, env, findMap, MAPS } from './config.js';
 import type { BotDb } from './db.js';
 import { codeToFlag, leaderboardEmbed, mapListEmbed, xpEmbed } from './embeds.js';
-import { SUBDIVISIONS, resolveSubdivision } from './data/subdivisions.js';
+import { resolveSubdivision, subdivisionsForCountry } from './data/subdivisions.js';
 import type { SessionManager } from './gameManager.js';
 import { logUnknownGuess } from './unknownGuesses.js';
 
@@ -126,7 +126,7 @@ export function buildCommands(): Map<string, Command> {
         await message.reply(`**${subdivision.name}**\nAliases: ${subdivision.aliases.join(', ')}`);
         return;
       }
-      const subdivisions = SUBDIVISIONS[status.countryCode] ?? [];
+      const subdivisions = subdivisionsForCountry(status.countryCode);
       const lines = subdivisions.map((subdivision) => `> **${subdivision.name}** — ${subdivision.aliases.slice(0, 3).join(', ')}`);
       if (lines.length === 0) {
         await message.reply('No subdivision data available.');
