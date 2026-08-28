@@ -1,9 +1,10 @@
 import { AttachmentBuilder, type Message } from 'discord.js';
-import { CONFIG, findMap, MAPS } from './config.js';
+import { CONFIG, env, findMap, MAPS } from './config.js';
 import type { BotDb } from './db.js';
 import { codeToFlag, leaderboardEmbed, mapListEmbed, xpEmbed } from './embeds.js';
 import { SUBDIVISIONS, resolveSubdivision } from './data/subdivisions.js';
 import type { SessionManager } from './gameManager.js';
+import { logUnknownGuess } from './unknownGuesses.js';
 
 export interface CommandContext {
   sessions: SessionManager;
@@ -42,8 +43,19 @@ export function buildCommands(): Map<string, Command> {
       if (result.ok) {
         await message.react(codeToFlag(result.code)).catch(() => {});
       } else if (result.reason === 'unknown-country') {
+        const status = session.getStatus();
+        const kind = status.mode === 'subdivision' ? 'subdivision' : 'country';
+        logUnknownGuess({
+          attemptedAt: new Date().toISOString(),
+          kind,
+          input,
+          channelId: message.channelId,
+          userId: message.author.id,
+          mapName: status.mapName,
+          countryCode: status.countryCode,
+        });
         await message.react('❓').catch(() => {});
-        await message.reply(`❓ Unknown country: *${input}*`).catch(() => {});
+        await message.reply(`❓ Unknown ${kind}: *${input}*`).catch(() => {});
       }
       // 'not-open' → silently ignore (no active round / already resolving)
     },
@@ -64,7 +76,18 @@ export function buildCommands(): Map<string, Command> {
       await message.react('⚡').catch(() => {});
       const result = await session.instantVote(message.author.id, input);
       if (!result.ok && result.reason === 'unknown-country') {
-        await message.reply(`❓ Unknown country: *${input}*`).catch(() => {});
+        const status = session.getStatus();
+        const kind = status.mode === 'subdivision' ? 'subdivision' : 'country';
+        logUnknownGuess({
+          attemptedAt: new Date().toISOString(),
+          kind,
+          input,
+          channelId: message.channelId,
+          userId: message.author.id,
+          mapName: status.mapName,
+          countryCode: status.countryCode,
+        });
+        await message.reply(`❓ Unknown ${kind}: *${input}*`).catch(() => {});
       } else if (!result.ok) {
         await message.react('❌').catch(() => {});
       }
@@ -105,7 +128,27 @@ export function buildCommands(): Map<string, Command> {
       }
       const subdivisions = SUBDIVISIONS[status.countryCode] ?? [];
       const lines = subdivisions.map((subdivision) => `> **${subdivision.name}** — ${subdivision.aliases.slice(0, 3).join(', ')}`);
-      await message.reply(`**Subdivisions — ${status.mapName}**\n${lines.join('\n') || 'No subdivision data available.'}`);
+      if (lines.length === 0) {
+        await message.reply('No subdivision data available.');
+        return;
+      }
+
+      // Discord limits message content to 2,000 characters.
+      const maxContent = 1_800;
+      const pages: string[] = [];
+      let page = '';
+      for (const line of lines) {
+        if (page && page.length + line.length + 1 > maxContent) {
+          pages.push(page);
+          page = '';
+        }
+        page += `${page ? '\n' : ''}${line}`;
+      }
+      if (page) pages.push(page);
+
+      for (const [index, content] of pages.entries()) {
+        await message.reply(`**Subdivisions — ${status.mapName} (${index + 1}/${pages.length})**\n${content}`);
+      }
     },
   });
   commands.set('a', commands.get('aliases')!);
@@ -126,6 +169,7 @@ export function buildCommands(): Map<string, Command> {
       // success is announced via the timerExtended event
     },
   });
+  commands.set('t', commands.get('time')!);
 
   // !image
   const image: Command = {
@@ -147,15 +191,6 @@ export function buildCommands(): Map<string, Command> {
   commands.set('image', image);
   commands.set('img', image);
   commands.set('pic', image);
-
-  // !leaderboard
-  const leaderboard: Command = {
-    handler: async (message, _args, ctx) => {
-      await message.reply({ embeds: [leaderboardEmbed(ctx.db.topStreaks(10))] });
-    },
-  };
-  commands.set('leaderboard', leaderboard);
-  commands.set('lb', leaderboard);
 
   // !switchmap [map]
   commands.set('switchmap', {
@@ -202,13 +237,31 @@ export function buildCommands(): Map<string, Command> {
     },
   });
 
+  // !topxp / !xplb — server leaderboard of XP balances
+  const topXp: Command = {
+    handler: async (message, _args, ctx) => {
+      const rows = ctx.db.topXp(10);
+      if (rows.length === 0) {
+        await message.reply('No XP recorded yet.');
+        return;
+      }
+      const medals = ['🥇', '🥈', '🥉'];
+      const lines = rows.map((row, index) =>
+        `> ${medals[index] ?? `**${index + 1}.**`} <@${row.userId}> — **${row.xp} XP**`,
+      );
+      await message.reply(`**⭐ XP Leaderboard**\n${lines.join('\n')}`);
+    },
+  };
+  commands.set('topxp', topXp);
+  commands.set('xplb', topXp);
+
   // !map / !cg — ChatGuessr map link
   const mapLink: Command = {
-    handler: async (message, _args, ctx) => {
-      const session = ctx.sessions.get(message.channelId);
-      if (!session) return;
-      const id = session.mapId;
-      await message.reply(`🗺️ https://www.geoguessr.com/maps/${id}`, );
+    handler: async (message) => {
+      await message.reply(
+        '🗺️ **ChatGuessr map**\n' + env.chatguessrMapUrl +
+          '\n\nUse `/w <latitude>, <longitude>` to submit your guess.',
+      );
     },
   };
   commands.set('map', mapLink);
@@ -238,7 +291,9 @@ export function buildCommands(): Map<string, Command> {
         await message.reply('No votes yet this round.');
         return;
       }
-      const lines = current.map((v) => `> ${codeToFlag(v.code)} <@${v.userId}> — ${v.name}`);
+      const lines = current.map((v) =>
+        `> ${codeToFlag(v.code)} <@${v.userId}> — ${v.name}${v.subdivisionName ? `, ${v.subdivisionName}` : ''}`,
+      );
       await message.reply(`**Votes this round**\n${lines.join('\n')}`);
     },
   };
@@ -287,8 +342,6 @@ export function buildCommands(): Map<string, Command> {
   };
   commands.set('top', top);
   commands.set('record', top);
-  // (leaderboard already registered above as !leaderboard / !lb)
-
   // !toprounds / !rounds — most rounds played
   const toprounds: Command = {
     handler: async (message, _args, ctx) => {
@@ -303,6 +356,24 @@ export function buildCommands(): Map<string, Command> {
   };
   commands.set('toprounds', toprounds);
   commands.set('rounds', toprounds);
+
+  // !top5k / !5k — server leaderboard of perfect hedge guesses
+  const top5k: Command = {
+    handler: async (message, _args, ctx) => {
+      const rows = ctx.db.topFiveKs(10);
+      if (rows.length === 0) {
+        await message.reply('No 5K guesses recorded yet.');
+        return;
+      }
+      const medals = ['🥇', '🥈', '🥉'];
+      const lines = rows.map((row, index) =>
+        `> ${medals[index] ?? `**${index + 1}.**`} <@${row.userId}> — **${row.fiveKs}** 5K${row.fiveKs === 1 ? '' : 's'}`,
+      );
+      await message.reply(`**🎯 5K Leaderboard**\n*Within ${CONFIG.fiveKDistanceMeters}m of the location*\n${lines.join('\n')}`);
+    },
+  };
+  commands.set('top5k', top5k);
+  commands.set('5k', top5k);
 
   // ---------- admin commands ----------
 
@@ -362,6 +433,7 @@ export function buildCommands(): Map<string, Command> {
           '',
           '**Jogo**',
           '`!g <país>` — Vota num país (podes mudar enquanto o timer não acabar)',
+          '`!g <país>, <subdivisão>` — País + subdivisão; subdivisão correta duplica o XP',
           'Em mapas de país: `!g <subdivisão>` — Vota numa subdivisão',
           '`!g <c1> or <c2>` — O bot escolhe aleatoriamente um dos países',
           '`!g cancel` — Cancela o teu voto',
@@ -377,11 +449,12 @@ export function buildCommands(): Map<string, Command> {
           '`!acc [mapa]` — A tua precisão por mapa',
           '`!top [mapa] [me]` — Top streaks do servidor',
           '`!toprounds` — Quem jogou mais rondas',
-          '`!leaderboard` — Maiores streaks',
+          '`!top5k` / `!5k` — Ranking de guesses hedge a 5K',
           '',
           '**Mapas & conta**',
           '`!switchmap [mapa|random]` — Lista ou muda de mapa',
           '`!xp` — O teu saldo de XP',
+          '`!topxp` / `!xplb` — Ranking de XP do servidor',
           '',
           '**Admin**',
           '`!end` / `!skip` / `!fix` / `!setstreak <n>`',

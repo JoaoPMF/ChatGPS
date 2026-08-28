@@ -30,6 +30,7 @@ export interface RoundLogRow {
   streakId: number | null;
   channelId: string;
   mapId: string;
+  mapName: string;
   roundNumber: number;
   lat: number;
   lng: number;
@@ -87,6 +88,23 @@ export class BotDb {
         is_correct INTEGER NOT NULL DEFAULT 0,
         ts INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS user_rounds (
+        round_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        is_correct INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (round_id, user_id)
+      );
+      CREATE TABLE IF NOT EXISTS hedge_guesses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel_id TEXT NOT NULL,
+        round_number INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        guess_lat REAL NOT NULL,
+        guess_lng REAL NOT NULL,
+        distance_meters REAL NOT NULL,
+        is_five_k INTEGER NOT NULL DEFAULT 0,
+        ts INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS game_state (
         channel_id TEXT PRIMARY KEY,
         game_json TEXT NOT NULL,
@@ -98,6 +116,10 @@ export class BotDb {
         updated_ts INTEGER NOT NULL
       );
     `);
+    const columns = this.db.prepare(`PRAGMA table_info(rounds)`).all() as { name: string }[];
+    if (!columns.some((column) => column.name === 'map_name')) {
+      this.db.exec(`ALTER TABLE rounds ADD COLUMN map_name TEXT`);
+    }
   }
 
   // ---------- users / XP ----------
@@ -204,13 +226,13 @@ export class BotDb {
   accuracyByMap(userId: string): { mapName: string | null; total: number; correct: number; acc: number }[] {
     return this.db
       .prepare(
-        `SELECT s.map_name AS mapName, COUNT(*) AS total,
-                SUM(CASE WHEN r.is_correct THEN 1 ELSE 0 END) AS correct,
-                ROUND(AVG(CASE WHEN r.is_correct THEN 100.0 ELSE 0 END), 1) AS acc
-         FROM rounds r
-         JOIN streaks s ON r.streak_id = s.id
-         WHERE EXISTS (SELECT 1 FROM streak_participants sp WHERE sp.streak_id = s.id AND sp.user_id = ?)
-         GROUP BY s.map_id
+        `SELECT r.map_name AS mapName, COUNT(*) AS total,
+                SUM(CASE WHEN ur.is_correct THEN 1 ELSE 0 END) AS correct,
+                ROUND(AVG(CASE WHEN ur.is_correct THEN 100.0 ELSE 0 END), 1) AS acc
+         FROM user_rounds ur
+         JOIN rounds r ON r.id = ur.round_id
+         WHERE ur.user_id = ?
+         GROUP BY r.map_id, r.map_name
          ORDER BY total DESC`,
       )
       .all(userId) as { mapName: string | null; total: number; correct: number; acc: number }[];
@@ -229,19 +251,66 @@ export class BotDb {
       .all(limit) as { userId: string; rounds: number }[];
   }
 
+  recordHedgeGuess(input: {
+    channelId: string;
+    roundNumber: number;
+    userId: string;
+    lat: number;
+    lng: number;
+    distanceMeters: number;
+    isFiveK: boolean;
+  }): void {
+    this.db.prepare(
+      `INSERT INTO hedge_guesses
+       (channel_id, round_number, user_id, guess_lat, guess_lng, distance_meters, is_five_k, ts)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      input.channelId,
+      input.roundNumber,
+      input.userId,
+      input.lat,
+      input.lng,
+      input.distanceMeters,
+      input.isFiveK ? 1 : 0,
+      Date.now(),
+    );
+  }
+
+  topFiveKs(limit: number): { userId: string; fiveKs: number }[] {
+    return this.db.prepare(
+      `SELECT user_id AS userId, COUNT(*) AS fiveKs
+       FROM hedge_guesses
+       WHERE is_five_k = 1
+       GROUP BY user_id
+       ORDER BY fiveKs DESC, MIN(ts) ASC
+       LIMIT ?`,
+    ).all(limit) as { userId: string; fiveKs: number }[];
+  }
+
+  topXp(limit: number): { userId: string; xp: number }[] {
+    return this.db.prepare(
+      `SELECT user_id AS userId, xp
+       FROM users
+       WHERE xp > 0
+       ORDER BY xp DESC, user_id ASC
+       LIMIT ?`,
+    ).all(limit) as { userId: string; xp: number }[];
+  }
+
   // ---------- rounds ----------
 
-  logRound(row: RoundLogRow): void {
-    this.db
+  logRound(row: RoundLogRow): number {
+    const result = this.db
       .prepare(
         `INSERT INTO rounds
-           (streak_id, channel_id, map_id, round_number, lat, lng, actual_code, actual_name, winning_code, winning_name, is_correct, ts)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (streak_id, channel_id, map_id, map_name, round_number, lat, lng, actual_code, actual_name, winning_code, winning_name, is_correct, ts)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         row.streakId,
         row.channelId,
         row.mapId,
+        row.mapName,
         row.roundNumber,
         row.lat,
         row.lng,
@@ -252,6 +321,13 @@ export class BotDb {
         row.isCorrect ? 1 : 0,
         Date.now(),
       );
+    return Number(result.lastInsertRowid);
+  }
+
+  logUserRound(roundId: number, userId: string, correct: boolean): void {
+    this.db
+      .prepare(`INSERT OR REPLACE INTO user_rounds (round_id, user_id, is_correct) VALUES (?, ?, ?)`)
+      .run(roundId, userId, correct ? 1 : 0);
   }
 
   // ---------- game state (crash recovery) ----------

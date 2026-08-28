@@ -101,6 +101,21 @@ describe('renderRoundView', () => {
     expect(data[off]).toBeGreaterThan(data[off + 2]);
   });
 
+  it('keeps the compass tied to the authored camera heading', async () => {
+    const pano = await makeTestPano();
+    const view = await renderRoundView(pano, { ...baseCam, heading: 90, drivingDirection: 180 });
+    const { data, info } = await sharp(view).raw().toBuffer({ resolveWithObject: true });
+    const compassSize = Math.max(90, Math.round(Math.min(info.width, info.height) * 0.16));
+    const pad = Math.round(compassSize * 0.3);
+    const centerX = pad + Math.round(compassSize / 2);
+    const centerY = info.height - compassSize - pad + Math.round(compassSize / 2);
+    const leftTip = (centerY * info.width + (centerX - Math.round(compassSize * 0.34))) * 3;
+    const bottomTip = ((centerY + Math.round(compassSize * 0.34)) * info.width + centerX) * 3;
+
+    expect(data[leftTip]).toBeGreaterThan(data[leftTip + 2]);
+    expect(data[leftTip]).toBeGreaterThan(data[bottomTip]);
+  });
+
   it('never returns null for a renderable pano, even a very dark one', async () => {
     // Solid near-black panorama (night location).
     const raw = Buffer.alloc(360 * 180 * 3, 10);

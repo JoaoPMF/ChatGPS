@@ -62,6 +62,8 @@ export const CONFIG = {
   maxTimeExtensions: 3,
   /** Cooldown for !switchmap per channel. */
   switchmapCooldownMs: 30_000,
+  /** Maximum distance for a /w guess to count as a 5K. */
+  fiveKDistanceMeters: 185,
   xp: {
     /** XP for casting any vote in a round. */
     participation: 5,
@@ -69,6 +71,8 @@ export const CONFIG = {
     correct: 25,
     /** Bonus XP to all voters of the round when the streak hits a milestone. */
     milestone: 100,
+    /** Bonus XP for a hedge guess within the 5K distance threshold. */
+    fiveK: 100,
     milestones: [5, 10, 25, 50, 100] as number[],
   },
 } as const;
@@ -82,6 +86,7 @@ export const env = {
     .map((s) => s.trim())
     .filter(Boolean),
   dbPath: process.env.DB_PATH ?? 'streaks.db',
+  chatguessrMapUrl: process.env.CHATGUESSR_MAP_URL ?? 'https://chatguessr.com/map/PlonkIt',
 };
 
 export function requireEnv(): void {

@@ -126,6 +126,29 @@ async function main(): Promise<void> {
     try {
       if (message.author.bot || !message.guild) return;
       if (!env.allowedChannelIds.includes(message.channelId)) return;
+
+      // ChatGuessr hedge guesses are pasted as plain `/w ...` messages.
+      const hedgeMatch = message.content.match(/^\/w(?:\s+(.+))?$/i);
+      if (hedgeMatch) {
+        const session = sessions.get(message.channelId);
+        if (!session) return;
+        const result = await session.submitHedgeGuess(message.author.id, hedgeMatch[1] ?? '');
+        if (!result.ok) {
+          const text = result.reason === 'invalid-coordinates'
+            ? 'Use `/w <latitude>, <longitude>`.'
+            : result.reason === 'unrecognized-location'
+              ? 'Those coordinates could not be matched to a country or subdivision.'
+            : result.reason === 'already-guessed'
+              ? 'You have already submitted a hedge guess this round.'
+              : 'There is no active round.';
+          await message.reply(`📍 ${text}`);
+        } else {
+          // The normal roundResolved event now posts the result embed, including the distance.
+          await message.react(result.isFiveK ? '🎯' : '✅').catch(() => {});
+        }
+        return;
+      }
+
       if (!message.content.startsWith(CONFIG.prefix)) return;
 
       let body = message.content.slice(CONFIG.prefix.length);

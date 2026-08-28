@@ -124,6 +124,17 @@ describe('GameSession', () => {
     expect(collected.resolved).toHaveLength(0);
   });
 
+  it('awards the 5K XP bonus for an exact /w guess', async () => {
+    const session = makeSession(db, collected);
+    await session.startNewGame();
+
+    const result = await session.submitHedgeGuess('u1', '48.85, 2.35');
+    expect(result).toMatchObject({ ok: true, isFiveK: true });
+    expect(collected.resolved).toHaveLength(1); // /w resolves through the normal instant path
+    expect(collected.resolved[0].isCorrect).toBe(true);
+    expect(db.getUser('u1').xp).toBe(CONFIG.xp.participation + CONFIG.xp.correct + CONFIG.xp.fiveK);
+  });
+
   it('resolves a correct majority vote, bumps the streak and awards XP', async () => {
     const session = makeSession(db, collected);
     await session.startNewGame();

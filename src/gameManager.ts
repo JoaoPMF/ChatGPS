@@ -12,6 +12,7 @@ import {
 } from './geoguessr.js';
 import { chooseFromInput, pickWinner, tallyVotes, type CastVote, type WinnerInfo } from './votes.js';
 import { computeXpAwards } from './xp.js';
+import { distanceMeters, parseCoordinates } from './hedge.js';
 
 export type Phase = 'loading' | 'open' | 'resolving';
 
@@ -32,6 +33,7 @@ export interface VoteAcceptedInfo {
   userId: string;
   code: string;
   countryName: string;
+  subdivisionName?: string;
   /** Present when the input used `or` and was randomly picked. */
   options?: string[];
   /** True when the user changed their previous vote. */
@@ -59,6 +61,8 @@ export interface RoundResolvedInfo {
   milestone: boolean;
   awards: ReadonlyMap<string, number>;
   mapsLink: string | null;
+  /** Distance for an instant /w guess, when this round was resolved by /w. */
+  hedgeDistanceMeters?: number;
 }
 
 export interface SessionEvents {
@@ -93,6 +97,19 @@ export interface ExtendResult {
   extensionsLeft?: number;
 }
 
+export type HedgeGuessResult =
+  | {
+      ok: true;
+      distanceMeters: number;
+      lat: number;
+      lng: number;
+      isFiveK: boolean;
+      actualCountryCode: string | null;
+      actualCountryName: string | null;
+      actualSubdivision: string | null;
+    }
+  | { ok: false; reason: 'invalid-coordinates' | 'unrecognized-location' | 'no-round' | 'already-guessed' };
+
 /** Per-channel game state machine. All GeoGuessr/geocoding/image dependencies are injected. */
 export class GameSession {
   phase: Phase = 'loading';
@@ -108,12 +125,14 @@ export class GameSession {
   private readonly votes = new Map<string, CastVote>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private deadline: number | null = null;
+  private hedgeDistanceForResult: number | null = null;
   private extensionsUsed = 0;
   private streakId: number | null = null;
   private actualPromise: Promise<GeoResult | null> | null = null;
   private imagePromise: Promise<Buffer | null> | null = null;
   private readonly rng: () => number;
   private readonly nowFn: () => number;
+  private readonly hedgeGuesses = new Set<string>();
 
   constructor(private readonly deps: SessionDeps) {
     this.rng = deps.rng ?? Math.random;
@@ -169,8 +188,10 @@ export class GameSession {
   private async beginLocation(): Promise<void> {
     this.current = playableRound(this.game!);
     this.votes.clear();
+    this.hedgeGuesses.clear();
     this.extensionsUsed = 0;
     this.deadline = null;
+    this.hedgeDistanceForResult = null;
     this.roundNumber++;
     this.phase = 'open';
 
@@ -216,7 +237,10 @@ export class GameSession {
     if (this.phase !== 'open' || !this.current) {
       return { ok: false, reason: 'not-open' };
     }
-    const { chosen, options } = chooseFromInput(input, this.rng);
+    const [countryInput, subdivisionInput] = this.mode === 'country' && input.includes(',')
+      ? input.split(/,(.+)/s).map((part) => part.trim())
+      : [input, undefined];
+    const { chosen, options } = chooseFromInput(countryInput, this.rng);
     const answer = this.mode === 'subdivision' && this.countryCode
       ? resolveSubdivision(this.countryCode, chosen)
       : resolveCountry(chosen);
@@ -227,7 +251,18 @@ export class GameSession {
     const firstVote = this.votes.size === 0;
     const changed = this.votes.has(userId);
     const code = this.mode === 'subdivision' ? answer.code : answer.code;
-    this.votes.set(userId, { userId, code, name: answer.name, at: this.nowFn() });
+    const guessedCountry = this.mode === 'country' ? resolveCountry(chosen) : null;
+    const guessedSubdivision = subdivisionInput && guessedCountry
+      ? resolveSubdivision(guessedCountry.code, subdivisionInput)
+      : null;
+    this.votes.set(userId, {
+      userId,
+      code,
+      name: answer.name,
+      subdivisionCode: guessedSubdivision?.code,
+      subdivisionName: guessedSubdivision?.name,
+      at: this.nowFn(),
+    });
     if (this.streakId !== null) this.deps.db.addParticipantVote(this.streakId, userId);
     if (firstVote) this.startTimer();
 
@@ -236,6 +271,7 @@ export class GameSession {
         userId,
         code,
         countryName: answer.name,
+        subdivisionName: guessedSubdivision?.name,
         options: options.length > 1 ? options : undefined,
         changed,
         firstVote,
@@ -249,6 +285,56 @@ export class GameSession {
   cancelVote(userId: string): boolean {
     if (this.phase !== 'open') return false;
     return this.votes.delete(userId);
+  }
+
+  /** Process a `/w` ChatGuessr coordinate guess once per player per round. */
+  async submitHedgeGuess(userId: string, input: string): Promise<HedgeGuessResult> {
+    if (!this.current || this.phase === 'loading' || this.phase === 'resolving') {
+      return { ok: false, reason: 'no-round' };
+    }
+    if (this.hedgeGuesses.has(userId)) return { ok: false, reason: 'already-guessed' };
+    const guess = parseCoordinates(input);
+    if (!guess) return { ok: false, reason: 'invalid-coordinates' };
+
+    const distance = distanceMeters(guess, { lat: this.current.lat, lng: this.current.lng });
+    const isFiveK = distance <= CONFIG.fiveKDistanceMeters;
+    const guessedLocation = await this.deps.geocoder.countryAt(guess.lat, guess.lng).catch(() => null);
+    if (!guessedLocation) return { ok: false, reason: 'unrecognized-location' };
+
+    const voteInput = this.mode === 'subdivision'
+      ? guessedLocation.subdivision ?? ''
+      : `${guessedLocation.name}${guessedLocation.subdivision ? `, ${guessedLocation.subdivision}` : ''}`;
+    if (!voteInput) return { ok: false, reason: 'unrecognized-location' };
+
+    this.suppressVoteEvent = true;
+    const voteResult = this.registerVote(userId, voteInput);
+    this.suppressVoteEvent = false;
+    if (!voteResult.ok) return { ok: false, reason: 'unrecognized-location' };
+
+    this.hedgeGuesses.add(userId);
+    this.hedgeDistanceForResult = distance;
+    const actual = this.actualPromise ? await this.actualPromise : null;
+    this.deps.db.recordHedgeGuess({
+      channelId: this.deps.channelId,
+      roundNumber: this.roundNumber,
+      userId,
+      lat: guess.lat,
+      lng: guess.lng,
+      distanceMeters: distance,
+      isFiveK,
+    });
+    if (isFiveK) this.deps.db.addXp(userId, CONFIG.xp.fiveK);
+    await this.resolveRound();
+    return {
+      ok: true,
+      distanceMeters: distance,
+      lat: guess.lat,
+      lng: guess.lng,
+      isFiveK,
+      actualCountryCode: actual?.code ?? null,
+      actualCountryName: actual?.name ?? null,
+      actualSubdivision: actual?.subdivision ?? null,
+    };
   }
 
   private startTimer(): void {
@@ -312,6 +398,7 @@ export class GameSession {
       : actual?.name ?? null;
     const isCorrect = actualAnswerCode !== null && winner.code.toUpperCase() === actualAnswerCode.toUpperCase();
     const endedStreak = this.streak;
+    const roundStreakId = this.streakId;
     let milestone = false;
 
     if (isCorrect) {
@@ -330,6 +417,13 @@ export class GameSession {
 
     // XP and stats
     const finalVotes = new Map([...this.votes].map(([u, v]) => [u, v.code]));
+    const subdivisionCorrectUsers = this.mode === 'country' && actual?.subdivisionCode
+      ? new Set(
+        [...this.votes.values()]
+          .filter((vote) => vote.subdivisionCode?.toUpperCase() === normalizeSubdivisionCode(actual.subdivisionCode)?.toUpperCase())
+          .map((vote) => vote.userId),
+      )
+      : new Set<string>();
     const awards = computeXpAwards({
       finalVotes,
       winningCode: winner.code,
@@ -337,16 +431,18 @@ export class GameSession {
       isCorrect,
       newStreak: this.streak,
       cfg: CONFIG.xp,
+      subdivisionCorrectUsers,
     });
     for (const [userId, amount] of awards) this.deps.db.addXp(userId, amount);
     for (const [userId, code] of finalVotes) {
       this.deps.db.recordVote(userId, isCorrect && code === winner.code);
     }
 
-    this.deps.db.logRound({
-      streakId: this.streakId,
+    const roundId = this.deps.db.logRound({
+      streakId: roundStreakId,
       channelId: this.deps.channelId,
       mapId: this.mapId,
+      mapName: this.mapName,
       roundNumber: this.roundNumber,
       lat: this.current.lat,
       lng: this.current.lng,
@@ -356,6 +452,9 @@ export class GameSession {
       winningName: winner.name,
       isCorrect,
     });
+    for (const [userId, code] of finalVotes) {
+      this.deps.db.logUserRound(roundId, userId, isCorrect && code === winner.code);
+    }
 
     this.persist();
 
@@ -375,8 +474,10 @@ export class GameSession {
       milestone,
       awards,
       mapsLink: roundMapsLink(this.current),
+      hedgeDistanceMeters: this.hedgeDistanceForResult ?? undefined,
     });
 
+    this.hedgeDistanceForResult = null;
     await this.advance();
   }
 
@@ -480,8 +581,13 @@ export class GameSession {
   }
 
   /** Current votes for `!votes`. */
-  currentVotes(): { userId: string; name: string; code: string }[] {
-    return [...this.votes.values()].map((v) => ({ userId: v.userId, name: v.name, code: v.code }));
+  currentVotes(): { userId: string; name: string; code: string; subdivisionName?: string }[] {
+    return [...this.votes.values()].map((v) => ({
+      userId: v.userId,
+      name: v.name,
+      code: v.code,
+      subdivisionName: v.subdivisionName,
+    }));
   }
 
   getStatus(): { phase: Phase; streak: number; deadline: number | null; votes: number; mapName: string; mode: AnswerMode; countryCode: string | null } {

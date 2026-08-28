@@ -4,6 +4,9 @@ export interface CastVote {
   code: string;
   /** Canonical country name. */
   name: string;
+  /** Optional subdivision selected alongside a country guess. */
+  subdivisionCode?: string;
+  subdivisionName?: string;
   /** Timestamp (ms) when this (final) vote was cast. */
   at: number;
 }

@@ -13,12 +13,16 @@ Once the first player has guessed, the other players have **10 seconds** to make
 | --- | --- |
 | `!g <country>` | Vote for a country |
 | `!g <country1> or <country2>` | Randomly vote for one of several countries |
+| `!g <country>, <subdivision>` | Guess a country with an optional subdivision for double XP |
 | `!time` | Extend the voting period by 20 seconds (max 3× per round) |
 | `!image` | Display the current location again |
-| `!leaderboard` | Display the highest streaks |
+| `!top [map] [me]` | Display the highest streaks, optionally filtered |
 | `!switchmap [map]` | List maps or switch to another map |
 | `!xp` | View your XP balance |
+| `!topxp` / `!xplb` | Server leaderboard of XP balances |
 | `!aliases [subdivision]` | List valid subdivisions or aliases for the current subdivision map |
+| `!map` / `!cg` | Get the configured ChatGuessr map link for hedge guesses |
+| `!top5k` / `!5k` | Server leaderboard of 5K `/w` guesses |
 | `!help` | Show the command list |
 
 Admin-only: `!start`, `!skip`, `!fix` (start a fresh game, keeping the streak), `!setstreak <n>`.
@@ -90,6 +94,28 @@ Unit tests cover country resolution & territory rules, vote tallying/tie-breaks,
 Gameplay constants live in [src/config.ts](src/config.ts): vote window (10s), `!time` extension (20s, max 3), XP values (5 participation / 25 correct / 100 milestone at streaks 5, 10, 25, 50, 100) and the map registry.
 
 The supplied country maps for Portugal, Argentina, Australia, Brazil, Canada, Chile, Colombia, India, Indonesia, Japan, Kazakhstan, the Philippines, Russia, South Africa and the United States automatically use subdivision streaks. On those maps, `!g <subdivision>` is the answer format; use `!aliases` to see the available ISO 3166-2 subdivisions. World maps continue to use country streaks.
+
+On country streak maps, you may optionally include a subdivision: `!g mexico, tamaulipas`. The country answer is checked normally; an incorrect subdivision does not cause a wrong answer. A correct subdivision doubles that player's XP reward for the round. ISO subdivision names are resolved for all countries, not only the dedicated subdivision maps.
+
+### Hedge guesses
+
+Use `!map` to receive the configured ChatGuessr link. After making a guess there, paste the resulting coordinate guess into Discord as `/w <latitude>, <longitude>` or paste a Google Maps URL containing the coordinates. The bot reports the distance from the round location. A guess within 185 metres counts as a **5K**, awards **+100 XP** by default, and is included in `!top5k`. Each player gets one hedge guess per round. This is only the basic hedge guess flow; speedrun, score and other hedge modes are intentionally not included.
+
+### Custom aliases
+
+Edit [src/data/custom-aliases.ts](src/data/custom-aliases.ts) to add your own aliases, then restart the bot. Country aliases use a two-letter country code; subdivision aliases use the full ISO 3166-2 code:
+
+```ts
+export const COUNTRY_ALIASES = {
+   US: ['murica'],
+};
+
+export const SUBDIVISION_ALIASES = {
+   'PT-11': ['lx'],       // Lisboa
+   'US-CA': ['cali'],     // California
+   'RU-MOW': ['moscow city'],
+};
+```
 
 ## Data
 

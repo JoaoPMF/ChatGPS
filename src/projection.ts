@@ -178,9 +178,9 @@ export async function renderRoundView(pano: Buffer, camera: RoundCamera): Promis
   // A view counts as valid when it is not dramatically darker than the pano itself.
   const threshold = Math.max(8, panoBrightness * 0.25);
 
-  // Compass convention (matches the reference bots): driving direction when present
-  // (official coverage), else the map's authored heading. Always shown.
-  const compassHeading = camera.drivingDirection ?? camera.heading;
+  // The compass shows north relative to the authored camera view, not the car's
+  // Street View travel direction.
+  const compassHeading = camera.heading;
 
   let best: Buffer | null = null;
   let bestBrightness = -1;

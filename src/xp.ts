@@ -15,6 +15,8 @@ export interface XpAwardInput {
   /** Streak length after this round (only meaningful when isCorrect). */
   newStreak: number;
   cfg: XpConfig;
+  /** Users whose optional subdivision guess was correct; country mode only. */
+  subdivisionCorrectUsers?: ReadonlySet<string>;
 }
 
 /**
@@ -31,6 +33,7 @@ export function computeXpAwards(input: XpAwardInput): Map<string, number> {
     let xp = input.cfg.participation;
     if (input.isCorrect && code === input.winningCode) xp += input.cfg.correct;
     if (hitMilestone) xp += input.cfg.milestone;
+    if (input.subdivisionCorrectUsers?.has(userId)) xp *= 2;
     awards.set(userId, xp);
   }
   return awards;

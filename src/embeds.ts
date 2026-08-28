@@ -59,6 +59,12 @@ export function resultEmbed(info: RoundResolvedInfo): EmbedBuilder {
     lines.push(`The vote was **${info.winningName}**.`);
     if (info.endedStreak > 0) lines.push(`💔 Streak ended at **${info.endedStreak}**.`);
   }
+  if (info.hedgeDistanceMeters !== undefined) {
+    const distance = info.hedgeDistanceMeters < 1000
+      ? `${Math.round(info.hedgeDistanceMeters)} m`
+      : `${(info.hedgeDistanceMeters / 1000).toFixed(1)} km`;
+    lines.push(`📍 \`/w\` distance: **${distance}**${info.hedgeDistanceMeters <= 185 ? ' · 🎯 **5K**' : ''}`);
+  }
 
   // Votes
   if (info.tally.length > 0) {
@@ -86,6 +92,27 @@ export function resultEmbed(info: RoundResolvedInfo): EmbedBuilder {
   embed.setDescription(lines.join('\n'));
   if (info.mapsLink) embed.setURL(info.mapsLink);
   return embed;
+}
+
+export function hedgeGuessEmbed(info: {
+  isFiveK: boolean;
+  distance: string;
+  actualCountryCode: string | null;
+  actualCountryName: string | null;
+  actualSubdivision: string | null;
+}): EmbedBuilder {
+  const country = `${codeToFlag(info.actualCountryCode)} **${info.actualCountryName ?? 'Unknown'}**`;
+  const lines = [
+    info.actualSubdivision ? `📍 **Subdivision:** ${info.actualSubdivision}` : '',
+    info.isFiveK
+      ? `🎯 **5K!** Your guess was **${info.distance}** away.`
+      : `Your guess was **${info.distance}** away.`,
+  ].filter(Boolean);
+
+  return new EmbedBuilder()
+    .setTitle(`${info.isFiveK ? '🎯' : '📍'} ${country}`)
+    .setDescription(lines.join('\n'))
+    .setColor(info.isFiveK ? 0xf1c40f : 0x3498db);
 }
 
 export function leaderboardEmbed(rows: TopStreakRow[]): EmbedBuilder {

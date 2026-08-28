@@ -55,4 +55,18 @@ describe('computeXpAwards', () => {
     });
     expect(awards.get('a')).toBe(30);
   });
+
+  it('doubles the reward when an optional subdivision guess is correct', () => {
+    const awards = computeXpAwards({
+      finalVotes: new Map([['a', 'MX'], ['b', 'MX']]),
+      winningCode: 'MX',
+      actualCode: 'MX',
+      isCorrect: true,
+      newStreak: 1,
+      cfg,
+      subdivisionCorrectUsers: new Set(['a']),
+    });
+    expect(awards.get('a')).toBe((cfg.participation + cfg.correct) * 2);
+    expect(awards.get('b')).toBe(cfg.participation + cfg.correct);
+  });
 });

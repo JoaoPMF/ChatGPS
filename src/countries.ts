@@ -1,4 +1,5 @@
 import { COUNTRIES, TERRITORY_TO_SOVEREIGN, type CountryDef } from './data/countries.js';
+import { COUNTRY_ALIASES } from './data/custom-aliases.js';
 
 /** Normalize free-text input for matching: lowercase, strip diacritics/punctuation, drop leading "the". */
 export function normalize(input: string): string {
@@ -16,7 +17,7 @@ const lookup = new Map<string, CountryDef>();
 for (const country of COUNTRIES) {
   lookup.set(normalize(country.name), country);
   lookup.set(country.code.toLowerCase(), country);
-  for (const alias of country.aliases ?? []) {
+  for (const alias of [...(country.aliases ?? []), ...(COUNTRY_ALIASES[country.code] ?? [])]) {
     lookup.set(normalize(alias), country);
   }
 }
