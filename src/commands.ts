@@ -315,7 +315,7 @@ export function buildCommands(): Map<string, Command> {
     },
   });
 
-  // !acc [map] — accuracy per map
+  // !acc [map] — accuracy per map, with a subdivision breakdown for subdivision maps
   commands.set('acc', {
     handler: async (message, args, ctx) => {
       const rows = ctx.db.accuracyByMap(message.author.id);
@@ -326,7 +326,12 @@ export function buildCommands(): Map<string, Command> {
       const mapArg = args.trim() ? findMap(args) : null;
       const filtered = mapArg ? rows.filter((r) => r.mapName === mapArg.name) : rows;
       const lines = filtered.map((r) => `> ${r.mapName ?? 'Unknown'} — **${r.acc}%** (${r.correct}/${r.total})`);
-      await message.reply(`**🎯 Accuracy**\n${lines.join('\n') || 'No data for that map.'}`);
+      const subdivisionLines = mapArg?.mode === 'subdivision'
+        ? ctx.db.accuracyBySubdivision(message.author.id, mapArg.id)
+          .map((r) => `> ${r.subdivision} — **${r.acc}%** (${r.correct}/${r.total})`)
+        : [];
+      const breakdown = subdivisionLines.length > 0 ? `\n**${mapArg!.name} subdivisions**\n${subdivisionLines.join('\n')}` : '';
+      await message.reply(`**🎯 Accuracy**\n${lines.join('\n') || 'No data for that map.'}${breakdown}`);
     },
   });
 

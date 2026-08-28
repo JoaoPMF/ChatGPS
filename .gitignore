@@ -7,3 +7,5 @@ dist/
 streaks.db
 .env.example
 smoke-view.jpg
+streaks.db-wal
+streaks.db-shm

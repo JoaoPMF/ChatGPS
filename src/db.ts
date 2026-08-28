@@ -238,6 +238,22 @@ export class BotDb {
       .all(userId) as { mapName: string | null; total: number; correct: number; acc: number }[];
   }
 
+  /** Accuracy per answered subdivision for a user on a specific map. */
+  accuracyBySubdivision(userId: string, mapId: string): { subdivision: string; total: number; correct: number; acc: number }[] {
+    return this.db
+      .prepare(
+        `SELECT r.actual_name AS subdivision, COUNT(*) AS total,
+                SUM(CASE WHEN ur.is_correct THEN 1 ELSE 0 END) AS correct,
+                ROUND(AVG(CASE WHEN ur.is_correct THEN 100.0 ELSE 0 END), 1) AS acc
+         FROM user_rounds ur
+         JOIN rounds r ON r.id = ur.round_id
+         WHERE ur.user_id = ? AND r.map_id = ? AND r.actual_name IS NOT NULL
+         GROUP BY r.actual_code, r.actual_name
+         ORDER BY total DESC, subdivision ASC`,
+      )
+      .all(userId, mapId) as { subdivision: string; total: number; correct: number; acc: number }[];
+  }
+
   /** Rounds played per user (server leaderboard). */
   topRounds(limit: number): { userId: string; rounds: number }[] {
     return this.db

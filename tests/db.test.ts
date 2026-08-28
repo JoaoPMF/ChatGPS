@@ -38,6 +38,10 @@ describe('BotDb accuracy', () => {
     expect(db.accuracyByMap('user')).toEqual([
       { mapName: 'Test Map', total: 2, correct: 1, acc: 50 },
     ]);
+    expect(db.accuracyBySubdivision('user', 'map-1')).toEqual([
+      { subdivision: 'France', total: 1, correct: 1, acc: 100 },
+      { subdivision: 'Germany', total: 1, correct: 0, acc: 0 },
+    ]);
     db.close();
   });
 });

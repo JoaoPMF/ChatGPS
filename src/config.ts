@@ -23,7 +23,7 @@ export const MAPS: MapDef[] = [
   { id: '6089bfcff6a0770001f645dd', name: 'An Arbitrary World', aliases: ['an arbitrary world', 'arbitrary world', 'aaw'], mode: 'country' },
   { id: '5be0de51fe3a84037ca36447', name: 'A Rural World', aliases: ['a rural world', 'rural world', 'rural'], mode: 'country' },
   { id: '6165f7176c26ac00016bca3d', name: 'A Skewed World', aliases: ['a skewed world', 'skewed world', 'asw'], mode: 'country' },
-  { id: '6484b2a40404933187c284b2', name: 'A Balanced AI Generated Portugal', aliases: ['portugal', 'balanced portugal'], mode: 'subdivision', countryCode: 'PT' },
+  { id: '69ab93c917013e56097d6653', name: 'A True Portugal', aliases: ['portugal', 'true portugal'], mode: 'subdivision', countryCode: 'PT' },
   { id: '63a3cef9571dcbb3660427c4', name: 'An Arbitrary Argentina', aliases: ['argentina'], mode: 'subdivision', countryCode: 'AR' },
   { id: '60afb9b2dcdbe60001438fa6', name: 'A Balanced Australia', aliases: ['australia'], mode: 'subdivision', countryCode: 'AU' },
   { id: '639dd16256418a9903a7b61b', name: 'GeoTime Austria', aliases: ['austria', 'geotime austria'], mode: 'subdivision', countryCode: 'AT' },
