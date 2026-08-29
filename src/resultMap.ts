@@ -670,7 +670,7 @@ function renderLegend(opts: ResultMapOptions): string {
 
   if (opts.isCorrect || !opts.winningName) {
     const textWidth = estimateTextWidth(actualText);
-    const badgeWidth = 32 + textWidth + 8;
+    const badgeWidth = 36 + textWidth + 12;
     return `<g transform="translate(12, ${HEIGHT - 34})">
       <rect width="${badgeWidth}" height="24" rx="5" fill="#111827" fill-opacity="0.92" stroke="#374151" stroke-width="1" />
       <circle cx="13" cy="12" r="4.5" fill="#22c55e" />
@@ -678,10 +678,14 @@ function renderLegend(opts: ResultMapOptions): string {
     </g>`;
   }
 
-  const actualBadgeWidth = 75 + estimateTextWidth(actualText);
-  const guessBadgeWidth = 72 + estimateTextWidth(guessText);
+  const actualBadgeWidth = 92 + estimateTextWidth(actualText);
+  const guessBadgeWidth = 88 + estimateTextWidth(guessText);
+  const fitsOneLine = actualBadgeWidth + guessBadgeWidth + 32 <= WIDTH;
+  const actualY = fitsOneLine ? HEIGHT - 34 : HEIGHT - 62;
+  const guessX = fitsOneLine ? actualBadgeWidth + 8 : 0;
+  const guessY = fitsOneLine ? 0 : 28;
 
-  return `<g transform="translate(12, ${HEIGHT - 34})">
+  return `<g transform="translate(12, ${actualY})">
     <g transform="translate(0, 0)">
       <rect width="${actualBadgeWidth}" height="24" rx="5" fill="#111827" fill-opacity="0.92" stroke="#374151" stroke-width="1" />
       <circle cx="13" cy="12" r="4.5" fill="#22c55e" />
@@ -689,7 +693,7 @@ function renderLegend(opts: ResultMapOptions): string {
         <tspan font-weight="bold">Actual:</tspan> <tspan font-weight="normal">${actualText}</tspan>
       </text>
     </g>
-    <g transform="translate(${actualBadgeWidth + 8}, 0)">
+    <g transform="translate(${guessX}, ${guessY})">
       <rect width="${guessBadgeWidth}" height="24" rx="5" fill="#111827" fill-opacity="0.92" stroke="#374151" stroke-width="1" />
       <circle cx="13" cy="12" r="4.5" fill="#ef4444" />
       <text x="23" y="16.5" font-family="${font}" font-size="12" fill="#f3f4f6">

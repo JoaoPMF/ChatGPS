@@ -70,7 +70,7 @@ export const SUBDIVISION_ALIASES: Record<string, string[]> = {
   'BR-RS': ['rs'], 'BR-RO': ['ro'], 'BR-RR': ['rr'], 'BR-SC': ['sc'], 'BR-SE': ['se'],
   'BR-SP': ['sp'], 'BR-TO': ['to', 'toc'],
   'CA-AB': ['alb', 'ab', 'al'], 'CA-BC': ['bc'], 'CA-MB': ['mb', 'mt', 'ma'], 'CA-NB': ['nb'],
-  'CA-NL': ['nl', 'nfl', 'nf'], 'CA-NT': ['nwt', 'nt'], 'CA-NS': ['ns'], 'CA-NU': ['nu', 'nv'],
+  'CA-NL': ['nl', 'nfl', 'nf', 'newfie'], 'CA-NT': ['nwt', 'nt'], 'CA-NS': ['ns'], 'CA-NU': ['nu', 'nv'],
   'CA-ON': ['ont', 'on', 'off'], 'CA-PE': ['pei', 'pe'], 'CA-QC': ['qc'], 'CA-SK': ['sk', 'sask'], 'CA-YT': ['yt'],
   'CL-AN': ['af', 'an', 'ii', '2'], 'CL-AP': ['ap', 'ari', 'xv', '15'], 'CL-AT': ['ata', 'at', 'atc', 'iii', '3'],
   'CL-AI': ['ai', 'xi', '11'], 'CL-BI': ['bb', 'bi', '8'], 'CL-CO': ['coc', 'coq', 'co', 'iv', '4'],

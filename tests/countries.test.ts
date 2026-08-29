@@ -118,7 +118,7 @@ describe('subdivision names and aliases', () => {
   it.each([
     ['AU', 'cx', 'CX'], ['CL', 'ñub', 'NB'], ['IN', 'dh', 'DH'], ['ID', 'pbd', 'PD'],
     ['KZ', 'ul', 'ULY'], ['PH', 'neg', '18'], ['US', 'bye', 'HI'], ['RU', 'spb', 'SPE'],
-    ['CA', 'sask', 'SK'],
+    ['CA', 'sask', 'SK'], ['CA', 'newfie', 'NL'],
     ['ES', 'corunha', 'C'],
     ['ES', 'sevilha', 'SE'],
     ['ES', 'saragoca', 'Z'],
