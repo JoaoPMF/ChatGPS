@@ -183,6 +183,7 @@ export const SUBDIVISIONS: Record<string, SubdivisionDef[]> = {
   RU: makeCountry('RU'),
   ZA: makeCountry('ZA'),
   US: makeCountry('US'),
+  ES: makeCountry('ES'),
 };
 
 export function subdivisionsForCountry(countryCode: string): SubdivisionDef[] {

@@ -16,9 +16,18 @@ describe('resolveCountry', () => {
     expect(resolveCountry('uk')?.code).toBe('GB');
     expect(resolveCountry('britain')?.code).toBe('GB');
     expect(resolveCountry('south korea')?.code).toBe('KR');
+    expect(resolveCountry('kpop')?.code).toBe('KR');
     expect(resolveCountry('holland')?.code).toBe('NL');
     expect(resolveCountry('czech republic')?.code).toBe('CZ');
     expect(resolveCountry('turkey')?.code).toBe('TR');
+    expect(resolveCountry('guat')?.code).toBe('GT');
+    expect(resolveCountry('bots')?.code).toBe('BW');
+    expect(resolveCountry('thai')?.code).toBe('TH');
+    expect(resolveCountry('phili')?.code).toBe('PH');
+    expect(resolveCountry('cambo')?.code).toBe('KH');
+    expect(resolveCountry('bangla')?.code).toBe('BD');
+    expect(resolveCountry('mex')?.code).toBe('MX');
+    expect(resolveCountry('colo')?.code).toBe('CO');
   });
 
   it('resolves the ISO code itself', () => {
@@ -109,6 +118,14 @@ describe('subdivision names and aliases', () => {
   it.each([
     ['AU', 'cx', 'CX'], ['CL', 'ñub', 'NB'], ['IN', 'dh', 'DH'], ['ID', 'pbd', 'PD'],
     ['KZ', 'ul', 'ULY'], ['PH', 'neg', '18'], ['US', 'bye', 'HI'], ['RU', 'spb', 'SPE'],
+    ['CA', 'sask', 'SK'],
+    ['ES', 'corunha', 'C'],
+    ['ES', 'sevilha', 'SE'],
+    ['ES', 'saragoca', 'Z'],
+    ['ES', 'biscaia', 'BI'],
+    ['ES', 'castelhao', 'CS'],
+    ['ES', 'madri', 'M'],
+    ['ES', 'valhadoli', 'VA'],
   ])('resolves requested aliases for %s', (countryCode, subdivision, expectedCode) => {
     expect(resolveSubdivision(countryCode, subdivision)?.code).toBe(expectedCode);
   });

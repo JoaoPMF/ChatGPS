@@ -45,6 +45,40 @@ export function pickWinner(votes: ReadonlyMap<string, CastVote>): WinnerInfo | n
   return best ? { code: best.code, name: best.name, count: best.count } : null;
 }
 
+/**
+ * Pick the most-voted subdivision for the winning country, if any.
+ * Ties are broken by earliest vote timestamp.
+ */
+export function pickWinningSubdivision(
+  votes: ReadonlyMap<string, CastVote>,
+  winningCountryCode: string,
+): { code?: string; name?: string } | null {
+  const matching = [...votes.values()].filter(
+    (v) => v.code.toUpperCase() === winningCountryCode.toUpperCase() && (v.subdivisionCode || v.subdivisionName),
+  );
+  if (matching.length === 0) return null;
+
+  const counts = new Map<string, { code?: string; name?: string; count: number; firstAt: number }>();
+  for (const v of matching) {
+    const key = (v.subdivisionCode || v.subdivisionName)!.toUpperCase();
+    const existing = counts.get(key);
+    if (existing) {
+      existing.count++;
+      if (v.at < existing.firstAt) existing.firstAt = v.at;
+    } else {
+      counts.set(key, { code: v.subdivisionCode, name: v.subdivisionName, count: 1, firstAt: v.at });
+    }
+  }
+
+  let best: { code?: string; name?: string; count: number; firstAt: number } | null = null;
+  for (const item of counts.values()) {
+    if (!best || item.count > best.count || (item.count === best.count && item.firstAt < best.firstAt)) {
+      best = item;
+    }
+  }
+  return best ? { code: best.code, name: best.name } : null;
+}
+
 /** Tally per country, sorted by vote count (desc), then by earliest first vote. */
 export function tallyVotes(votes: ReadonlyMap<string, CastVote>): WinnerInfo[] {
   const counts = new Map<string, number>();

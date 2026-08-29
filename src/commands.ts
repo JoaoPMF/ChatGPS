@@ -1,8 +1,10 @@
 import { AttachmentBuilder, MessageFlags, type Message } from 'discord.js';
 import { CONFIG, env, findMap, MAPS } from './config.js';
+import { resolveCountry } from './countries.js';
+import { COUNTRIES } from './data/countries.js';
 import type { BotDb } from './db.js';
 import { codeToFlag, leaderboardEmbed, mapListEmbed, xpEmbed } from './embeds.js';
-import { resolveSubdivision, subdivisionsForCountry } from './data/subdivisions.js';
+import { resolveSubdivision, SUBDIVISIONS, subdivisionsForCountry } from './data/subdivisions.js';
 import type { SessionManager } from './gameManager.js';
 import { logUnknownGuess } from './unknownGuesses.js';
 
@@ -106,49 +108,126 @@ export function buildCommands(): Map<string, Command> {
     },
   });
 
-  // !aliases [subdivision] — show valid subdivision aliases for the current country map
+  // !aliases [country] [subdivision] — show valid subdivision aliases for the current map or any specified country
   commands.set('aliases', {
     handler: async (message, args, ctx) => {
       const session = ctx.sessions.get(message.channelId);
-      if (!session) return;
-      const status = session.getStatus();
-      if (status.mode !== 'subdivision' || !status.countryCode) {
-        await message.reply('This command is only available on subdivision maps.');
-        return;
-      }
+      const status = session?.getStatus();
       const query = args.trim();
-      if (query) {
-        const subdivision = resolveSubdivision(status.countryCode, query);
-        if (!subdivision) {
-          await message.reply(`Unknown subdivision: *${query}*`);
+
+      const sendSubdivisionList = async (msg: Message, title: string, subdivisions: ReturnType<typeof subdivisionsForCountry>) => {
+        const lines = subdivisions.map((subdivision) => `> **${subdivision.name}** — ${subdivision.aliases.slice(0, 3).join(', ')}`);
+        if (lines.length === 0) {
+          await msg.reply(`No subdivision data available for ${title}.`);
           return;
         }
-        await message.reply(`**${subdivision.name}**\nAliases: ${subdivision.aliases.join(', ')}`);
-        return;
-      }
-      const subdivisions = subdivisionsForCountry(status.countryCode);
-      const lines = subdivisions.map((subdivision) => `> **${subdivision.name}** — ${subdivision.aliases.slice(0, 3).join(', ')}`);
-      if (lines.length === 0) {
-        await message.reply('No subdivision data available.');
-        return;
-      }
 
-      // Discord limits message content to 2,000 characters.
-      const maxContent = 1_800;
-      const pages: string[] = [];
-      let page = '';
-      for (const line of lines) {
-        if (page && page.length + line.length + 1 > maxContent) {
-          pages.push(page);
-          page = '';
+        const maxContent = 1_800;
+        const pages: string[] = [];
+        let page = '';
+        for (const line of lines) {
+          if (page && page.length + line.length + 1 > maxContent) {
+            pages.push(page);
+            page = '';
+          }
+          page += `${page ? '\n' : ''}${line}`;
         }
-        page += `${page ? '\n' : ''}${line}`;
-      }
-      if (page) pages.push(page);
+        if (page) pages.push(page);
 
-      for (const [index, content] of pages.entries()) {
-        await message.reply(`**Subdivisions — ${status.mapName} (${index + 1}/${pages.length})**\n${content}`);
+        for (const [index, content] of pages.entries()) {
+          await msg.reply(`**Subdivisions — ${title} (${index + 1}/${pages.length})**\n${content}`);
+        }
+      };
+
+      // 1. No arguments: show current map's subdivisions if in subdivision mode, otherwise show usage
+      if (!query) {
+        if (status?.mode === 'subdivision' && status.countryCode) {
+          const subdivisions = subdivisionsForCountry(status.countryCode);
+          await sendSubdivisionList(message, status.mapName, subdivisions);
+          return;
+        }
+        await message.reply('Usage: `!aliases [country]` (e.g. `!aliases pt` or `!aliases canada`) or `!aliases <country>, <subdivision>`');
+        return;
       }
+
+      // 2. Comma-separated: "!aliases <country>, <subdivision>"
+      if (query.includes(',')) {
+        const [countryPart, subPart] = query.split(/,(.+)/s).map((s) => s.trim());
+        const country = resolveCountry(countryPart);
+        if (!country) {
+          await message.reply(`Unknown country: *${countryPart}*`);
+          return;
+        }
+        if (!subPart) {
+          const subdivisions = subdivisionsForCountry(country.code);
+          await sendSubdivisionList(message, country.name, subdivisions);
+          return;
+        }
+        const subdivision = resolveSubdivision(country.code, subPart);
+        if (!subdivision) {
+          await message.reply(`Unknown subdivision: *${subPart}* for ${country.name}. Use \`!aliases ${countryPart}\` to see all.`);
+          return;
+        }
+        await message.reply(`**${subdivision.name}** (${country.name})\nAliases: ${subdivision.aliases.join(', ')}`);
+        return;
+      }
+
+      // 3. Exact country match: "!aliases canada", "!aliases pt", "!aliases us"
+      const countryMatch = resolveCountry(query);
+      if (countryMatch) {
+        const subdivisions = subdivisionsForCountry(countryMatch.code);
+        await sendSubdivisionList(message, countryMatch.name, subdivisions);
+        return;
+      }
+
+      // 4. On a subdivision map: check if query is a subdivision on the current map (e.g. "!aliases lisbon")
+      if (status?.mode === 'subdivision' && status.countryCode) {
+        const currentSub = resolveSubdivision(status.countryCode, query);
+        if (currentSub) {
+          await message.reply(`**${currentSub.name}**\nAliases: ${currentSub.aliases.join(', ')}`);
+          return;
+        }
+      }
+
+      // 5. Space-separated: "<country> <subdivision>" (e.g. "!aliases us california", "!aliases ca sask")
+      const words = query.split(/\s+/);
+      for (let i = words.length - 1; i >= 1; i--) {
+        const cPart = words.slice(0, i).join(' ');
+        const sPart = words.slice(i).join(' ');
+        const c = resolveCountry(cPart);
+        if (c) {
+          const s = resolveSubdivision(c.code, sPart);
+          if (s) {
+            await message.reply(`**${s.name}** (${c.name})\nAliases: ${s.aliases.join(', ')}`);
+            return;
+          }
+        }
+      }
+
+      // 6. Global search across all supported subdivision countries
+      const matchedResults: { countryName: string; subdivision: ReturnType<typeof resolveSubdivision> }[] = [];
+      const countryCodesToCheck = Object.keys(SUBDIVISIONS);
+      for (const cCode of countryCodesToCheck) {
+        const found = resolveSubdivision(cCode, query);
+        if (found) {
+          const cName = COUNTRIES.find((c) => c.code === cCode)?.name ?? cCode;
+          matchedResults.push({ countryName: cName, subdivision: found });
+        }
+      }
+
+      if (matchedResults.length === 1) {
+        const { countryName, subdivision } = matchedResults[0];
+        await message.reply(`**${subdivision!.name}** (${countryName})\nAliases: ${subdivision!.aliases.join(', ')}`);
+        return;
+      }
+
+      if (matchedResults.length > 1) {
+        const lines = matchedResults.map((m) => `> **${m.subdivision!.name}** (${m.countryName}) — ${m.subdivision!.aliases.slice(0, 3).join(', ')}`);
+        await message.reply(`**Found multiple matching subdivisions:**\n${lines.join('\n')}\nUse \`!aliases <country>, <subdivision>\` to view a specific one.`);
+        return;
+      }
+
+      await message.reply(`Unknown country or subdivision: *${query}*. Use \`!aliases <country>\` or \`!aliases <country>, <subdivision>\`.`);
     },
   });
   commands.set('a', commands.get('aliases')!);
@@ -449,7 +528,7 @@ export function buildCommands(): Map<string, Command> {
           '`!time` — Estende a votação em 20s (máx. 3×)',
           '`!votes` — Mostra os votos atuais',
           '`!streak` — Mostra a streak atual',
-          '`!aliases [subdivisão]` — Subdivisões e aliases válidos do mapa atual',
+          '`!aliases [país] [subdivisão]` — Subdivisões e aliases válidos do mapa atual ou de qualquer país',
           '`!map` — Link para o mapa ChatGuessr',
           '',
           '**Records & stats**',

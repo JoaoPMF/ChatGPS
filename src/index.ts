@@ -41,9 +41,10 @@ function makeChannelEvents(channel: SendableChannels): SessionEvents {
       );
     },
     roundResolved: async (info) => {
+      const mapBuffer = info.hedgeMap ?? info.resultMap;
       await channel.send({
         embeds: [resultEmbed(info)],
-        files: info.hedgeMap ? [new AttachmentBuilder(info.hedgeMap, { name: 'hedge-map.png' })] : [],
+        files: mapBuffer ? [new AttachmentBuilder(mapBuffer, { name: 'result-map.png' })] : [],
       });
     },
     error: async (info) => {

@@ -17,15 +17,19 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
+    "d3-geo": "^3.1.1",
     "discord.js": "^14.18.0",
     "dotenv": "^16.5.0",
     "iso-3166-2": "^1.0.0",
-    "sharp": "^0.33.5"
+    "sharp": "^0.33.5",
+    "topojson-client": "^3.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.26.0",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/d3-geo": "^3.1.1",
     "@types/node": "^22.15.0",
+    "@types/topojson-client": "^3.1.5",
     "eslint": "^9.26.0",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",

@@ -21,7 +21,10 @@ function makeClient(): IGeoGuessrClient {
 }
 
 const geocoder: IGeocoder = {
-  countryAt: async (lat: number) => (lat > 45 ? { code: 'FR', name: 'France' } : { code: 'ES', name: 'Spain' }),
+  countryAt: async (lat: number) =>
+    lat > 45
+      ? { code: 'FR', name: 'France', subdivision: 'Paris', subdivisionCode: 'FR-75' }
+      : { code: 'ES', name: 'Spain' },
 };
 
 interface Collected {
@@ -38,6 +41,7 @@ function makeSession(db: BotDb, collected: Collected, rng?: () => number): GameS
     db,
     rng,
     imageProvider: async () => null,
+    resultMapProvider: async () => null,
     events: {
       roundStarted: (info) => {
         collected.started.push(info);
@@ -132,7 +136,9 @@ describe('GameSession', () => {
     expect(result).toMatchObject({ ok: true, isFiveK: true });
     expect(collected.resolved).toHaveLength(1); // /w resolves through the normal instant path
     expect(collected.resolved[0].isCorrect).toBe(true);
-    expect(db.getUser('u1').xp).toBe(CONFIG.xp.participation + CONFIG.xp.correct + CONFIG.xp.fiveK);
+    expect(db.getUser('u1').xp).toBe(
+      (CONFIG.xp.participation + CONFIG.xp.correct) * 2 + CONFIG.xp.fiveK,
+    );
   });
 
   it('resolves a correct majority vote, bumps the streak and awards XP', async () => {
@@ -269,5 +275,19 @@ describe('GameSession', () => {
     await restored.restore(saved!);
     expect(restored.getStatus().streak).toBe(1);
     expect(restored.getStatus().phase).toBe('open');
+  });
+
+  it('awards double XP and reports subdivision bonus when optional subdivision is correct', async () => {
+    const session = makeSession(db, collected);
+    await session.startNewGame();
+    session.registerVote('u1', 'france, paris');
+    session.registerVote('u2', 'france');
+    await vi.advanceTimersByTimeAsync(CONFIG.voteWindowMs + 1);
+
+    expect(collected.resolved).toHaveLength(1);
+    const result = collected.resolved[0];
+    expect(result.subdivisionBonusUsers).toEqual(['u1']);
+    expect(result.awards.get('u1')).toBe((CONFIG.xp.participation + CONFIG.xp.correct) * 2);
+    expect(result.awards.get('u2')).toBe(CONFIG.xp.participation + CONFIG.xp.correct);
   });
 });

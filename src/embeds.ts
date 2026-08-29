@@ -50,8 +50,7 @@ export function resultEmbed(info: RoundResolvedInfo): EmbedBuilder {
   }
 
   // Outcome line
-  if (info.isCorrect) {
-  } else {
+  if (!info.isCorrect) {
     lines.push(`The vote was **${info.winningName}**.`);
     if (info.endedStreak > 0) lines.push(`💔 Streak ended at **${info.endedStreak}**.`);
   }
@@ -78,6 +77,13 @@ export function resultEmbed(info: RoundResolvedInfo): EmbedBuilder {
     lines.push(`🏅 **Milestone!** Streak **${info.streak}** — everyone earned +${CONFIG.xp.milestone} XP!`);
   }
 
+  // Subdivision bonus
+  if (info.subdivisionBonusUsers && info.subdivisionBonusUsers.length > 0) {
+    lines.push('');
+    const userMentions = info.subdivisionBonusUsers.map((u) => `<@${u}>`).join(', ');
+    lines.push(`🎯 **Right subdivision!** ${userMentions} earned **double XP**!`);
+  }
+
   // XP awards
   if (info.awards.size > 0) {
     const awardText = [...info.awards].map(([userId, xp]) => `<@${userId}> \`+${xp} XP\``).join('  ');
@@ -86,7 +92,8 @@ export function resultEmbed(info: RoundResolvedInfo): EmbedBuilder {
   }
 
   embed.setDescription(lines.join('\n'));
-  if (info.hedgeMap) embed.setImage('attachment://hedge-map.png');
+  const mapBuffer = info.hedgeMap ?? info.resultMap;
+  if (mapBuffer) embed.setImage('attachment://result-map.png');
   if (info.mapsLink) embed.setURL(info.mapsLink);
   return embed;
 }

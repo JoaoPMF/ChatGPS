@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { chooseFromInput, pickWinner, tallyVotes, type CastVote } from '../src/votes.js';
+import { chooseFromInput, pickWinner, pickWinningSubdivision, tallyVotes, type CastVote } from '../src/votes.js';
 
-function vote(userId: string, code: string, name: string, at: number): CastVote {
-  return { userId, code, name, at };
+function vote(userId: string, code: string, name: string, at: number, subdivisionCode?: string, subdivisionName?: string): CastVote {
+  return { userId, code, name, at, subdivisionCode, subdivisionName };
 }
 
 describe('pickWinner', () => {
@@ -50,6 +50,36 @@ describe('pickWinner', () => {
     const tally = tallyVotes(votes);
     expect(tally[0]).toEqual({ code: 'FR', name: 'France', count: 2 });
     expect(tally[1]).toEqual({ code: 'ES', name: 'Spain', count: 1 });
+  });
+});
+
+describe('pickWinningSubdivision', () => {
+  it('returns null if no votes exist or no subdivision was guessed', () => {
+    expect(pickWinningSubdivision(new Map(), 'US')).toBeNull();
+
+    const votesWithoutSub = new Map<string, CastVote>([
+      ['a', vote('a', 'US', 'United States', 1000)],
+      ['b', vote('b', 'FR', 'France', 1100)],
+    ]);
+    expect(pickWinningSubdivision(votesWithoutSub, 'US')).toBeNull();
+  });
+
+  it('picks the most-voted subdivision for the winning country', () => {
+    const votes = new Map<string, CastVote>([
+      ['a', vote('a', 'US', 'United States', 1000, 'US-CA', 'California')],
+      ['b', vote('b', 'US', 'United States', 1100, 'US-TX', 'Texas')],
+      ['c', vote('c', 'US', 'United States', 1200, 'US-CA', 'California')],
+      ['d', vote('d', 'FR', 'France', 900, 'FR-75', 'Paris')],
+    ]);
+    expect(pickWinningSubdivision(votes, 'US')).toEqual({ code: 'US-CA', name: 'California' });
+  });
+
+  it('breaks ties between subdivisions by earliest timestamp', () => {
+    const votes = new Map<string, CastVote>([
+      ['a', vote('a', 'US', 'United States', 2000, 'US-TX', 'Texas')],
+      ['b', vote('b', 'US', 'United States', 1000, 'US-CA', 'California')],
+    ]);
+    expect(pickWinningSubdivision(votes, 'US')).toEqual({ code: 'US-CA', name: 'California' });
   });
 });
 

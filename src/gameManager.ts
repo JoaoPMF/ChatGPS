@@ -10,10 +10,11 @@ import {
   type IGeoGuessrClient,
   type RoundInfo,
 } from './geoguessr.js';
-import { chooseFromInput, pickWinner, tallyVotes, type CastVote, type WinnerInfo } from './votes.js';
+import { chooseFromInput, pickWinner, pickWinningSubdivision, tallyVotes, type CastVote, type WinnerInfo } from './votes.js';
 import { computeXpAwards } from './xp.js';
 import { distanceMeters, parseCoordinates } from './hedge.js';
 import { renderHedgeMap } from './hedgeMap.js';
+import { renderResultMap } from './resultMap.js';
 
 export type Phase = 'loading' | 'open' | 'resolving';
 
@@ -61,12 +62,16 @@ export interface RoundResolvedInfo {
   /** Streak before this round (meaningful when it reset). */
   endedStreak: number;
   milestone: boolean;
+  /** Users who guessed the optional subdivision correctly in country mode. */
+  subdivisionBonusUsers?: string[];
   awards: ReadonlyMap<string, number>;
   mapsLink: string | null;
   /** Distance for an instant /w guess, when this round was resolved by /w. */
   hedgeDistanceMeters?: number;
   /** Map image comparing a successful hedge guess to the actual round location. */
   hedgeMap?: Buffer;
+  /** Country/subdivision map image with highlighted actual (green) and guessed (red) regions. */
+  resultMap?: Buffer;
 }
 
 export interface SessionEvents {
@@ -84,6 +89,7 @@ export interface SessionDeps {
   db: BotDb;
   events: SessionEvents;
   imageProvider?: ImageProvider;
+  resultMapProvider?: (opts: import('./resultMap.js').ResultMapOptions) => Promise<Buffer | null>;
   rng?: () => number;
   now?: () => number;
   mapId?: string;
@@ -470,6 +476,25 @@ export class GameSession {
 
     this.persist();
 
+    const getResultMap = this.deps.resultMapProvider ?? renderResultMap;
+    let resultMap = this.hedgeMapForResult;
+    if (!resultMap) {
+      const winningSubdivision = this.mode === 'country' ? pickWinningSubdivision(this.votes, winner.code) : null;
+      resultMap = await getResultMap({
+        mode: this.mode,
+        countryCode: this.countryCode,
+        actualCode: actualAnswerCode,
+        actualName: actualAnswerName,
+        actualLat: this.current.lat,
+        actualLng: this.current.lng,
+        winningCode: winner.code,
+        winningName: winner.name,
+        winningSubdivisionCode: winningSubdivision?.code ?? null,
+        winningSubdivisionName: winningSubdivision?.name ?? null,
+        isCorrect,
+      }).catch(() => null);
+    }
+
     await this.deps.events.roundResolved?.({
       isCorrect,
       skipped: false,
@@ -485,10 +510,12 @@ export class GameSession {
       streak: this.streak,
       endedStreak,
       milestone,
+      subdivisionBonusUsers: subdivisionCorrectUsers.size > 0 ? [...subdivisionCorrectUsers] : undefined,
       awards,
       mapsLink: roundMapsLink(this.current),
       hedgeDistanceMeters: this.hedgeDistanceForResult ?? undefined,
       hedgeMap: this.hedgeMapForResult ?? undefined,
+      resultMap: resultMap ?? undefined,
     });
 
     this.hedgeDistanceForResult = null;
@@ -518,6 +545,17 @@ export class GameSession {
     this.streakId = null;
     this.persist();
 
+    const getResultMap = this.deps.resultMapProvider ?? renderResultMap;
+    const resultMap = await getResultMap({
+      mode: this.mode,
+      countryCode: this.countryCode,
+      actualCode: actualAnswerCode,
+      actualName: actualAnswerName,
+      actualLat: this.current.lat,
+      actualLng: this.current.lng,
+      isCorrect: false,
+    }).catch(() => null);
+
     await this.deps.events.roundResolved?.({
       isCorrect: false,
       skipped: true,
@@ -535,6 +573,7 @@ export class GameSession {
       milestone: false,
       awards: new Map(),
       mapsLink: roundMapsLink(this.current),
+      resultMap: resultMap ?? undefined,
     });
 
     await this.advance();

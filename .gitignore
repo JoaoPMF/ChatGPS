@@ -9,3 +9,4 @@ streaks.db
 smoke-view.jpg
 streaks.db-wal
 streaks.db-shm
+data/map-cache/
