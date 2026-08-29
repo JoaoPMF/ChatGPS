@@ -11,6 +11,9 @@ const HEIGHT = 340;
 const TILE_SIZE = 256;
 const CACHE_DIR = join(process.cwd(), 'data', 'map-cache');
 const memoryCache = new Map<string, any>();
+// Arial/Helvetica aren't installed on typical Linux hosts, which makes librsvg render tofu boxes;
+// these fonts ship with common Linux font packages (fonts-dejavu-core, fonts-liberation, fonts-noto-core).
+const MAP_FONT = "'DejaVu Sans', 'Liberation Sans', 'Noto Sans', sans-serif";
 
 // Alpha-2 to Alpha-3 mapping for geoBoundaries
 const ALPHA2_TO_ALPHA3: Record<string, string> = {
@@ -495,13 +498,13 @@ async function renderCountryMap(opts: ResultMapOptions): Promise<Buffer | null> 
   for (const [x, y] of actualCentroids) {
     markers.push(
       `<circle cx="${x}" cy="${y}" r="9" fill="#16a34a" stroke="#ffffff" stroke-width="2.5" />` +
-      `<text x="${x}" y="${y + 4}" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#ffffff">A</text>`,
+      `<text x="${x}" y="${y + 4}" text-anchor="middle" font-family="${MAP_FONT}" font-size="10" font-weight="bold" fill="#ffffff">A</text>`,
     );
   }
   for (const [x, y] of guessCentroids) {
     markers.push(
       `<circle cx="${x}" cy="${y}" r="9" fill="#dc2626" stroke="#ffffff" stroke-width="2.5" />` +
-      `<text x="${x}" y="${y + 4}" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#ffffff">G</text>`,
+      `<text x="${x}" y="${y + 4}" text-anchor="middle" font-family="${MAP_FONT}" font-size="10" font-weight="bold" fill="#ffffff">G</text>`,
     );
   }
 
@@ -624,13 +627,13 @@ async function renderSubdivisionMap(opts: ResultMapOptions): Promise<Buffer | nu
   for (const [x, y] of actualCentroids) {
     markers.push(
       `<circle cx="${x}" cy="${y}" r="9" fill="#16a34a" stroke="#ffffff" stroke-width="2.5" />` +
-      `<text x="${x}" y="${y + 4}" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#ffffff">A</text>`,
+      `<text x="${x}" y="${y + 4}" text-anchor="middle" font-family="${MAP_FONT}" font-size="10" font-weight="bold" fill="#ffffff">A</text>`,
     );
   }
   for (const [x, y] of guessCentroids) {
     markers.push(
       `<circle cx="${x}" cy="${y}" r="9" fill="#dc2626" stroke="#ffffff" stroke-width="2.5" />` +
-      `<text x="${x}" y="${y + 4}" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#ffffff">G</text>`,
+      `<text x="${x}" y="${y + 4}" text-anchor="middle" font-family="${MAP_FONT}" font-size="10" font-weight="bold" fill="#ffffff">G</text>`,
     );
   }
 
@@ -661,7 +664,7 @@ function estimateTextWidth(text: string): number {
 }
 
 function renderLegend(opts: ResultMapOptions): string {
-  const font = "Arial, 'Helvetica Neue', Helvetica, sans-serif";
+  const font = MAP_FONT;
   const actualText = escapeXml(opts.actualName ?? opts.actualCode ?? 'Actual');
   const guessText = escapeXml(opts.winningName ?? opts.winningCode ?? 'Guess');
 

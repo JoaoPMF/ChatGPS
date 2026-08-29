@@ -1,4 +1,5 @@
 import { AttachmentBuilder, Client, GatewayIntentBits, PermissionFlagsBits, type SendableChannels } from 'discord.js';
+import sharp from 'sharp';
 import { buildCommands } from './commands.js';
 import { CONFIG, DEFAULT_MAP, env, requireEnv } from './config.js';
 import { BotDb } from './db.js';
@@ -9,6 +10,13 @@ import { SessionManager, type SessionEvents } from './gameManager.js';
 import { isUsablePanoId } from './geoguessr.js';
 import { fetchPanorama, resolvePanoId } from './pano.js';
 import { BASE_FOV, renderRoundView } from './projection.js';
+
+// libvips' operation cache retains decoded pixel buffers between renders; every round decodes a
+// unique panorama, so nothing there is ever reused — disable it so it can't accumulate memory.
+sharp.cache(false);
+// One worker thread avoids extra glibc malloc arenas, which on Linux are the usual reason process
+// RSS climbs indefinitely with sharp/libvips even though there's no JS-level leak.
+sharp.concurrency(1);
 
 function makeChannelEvents(channel: SendableChannels): SessionEvents {
   return {
