@@ -160,6 +160,17 @@ function makeCountry(countryCode: string): SubdivisionDef[] {
   }))];
 }
 
+/** The bundled ISO data includes obsolete island-group entries alongside Indonesia's provinces. */
+const INDONESIAN_PROVINCES = makeCountry('ID').filter((subdivision) => ![
+  'JW', // Jawa
+  'SM', // Sumatera
+  'SL', // Sulawesi
+  'KA', // Kalimantan
+  'ML', // obsolete Maluku duplicate
+  'NU', // Nusa Tenggara
+  'PP', // obsolete Papua duplicate
+].includes(subdivision.code));
+
 /** Complete ISO 3166-2 first-level subdivision data for supported country maps. */
 export const SUBDIVISIONS: Record<string, SubdivisionDef[]> = {
   AT: makeCountry('AT'),
@@ -170,10 +181,11 @@ export const SUBDIVISIONS: Record<string, SubdivisionDef[]> = {
   CA: makeCountry('CA'),
   CL: makeCountry('CL'),
   CO: makeCountry('CO'),
+  DE: makeCountry('DE'),
   GL: GREENLAND_SUBDIVISIONS,
   GR: makeCountry('GR'),
   IN: makeCountry('IN'),
-  ID: makeCountry('ID'),
+  ID: INDONESIAN_PROVINCES,
   IT: makeCountry('IT'),
   JP: makeCountry('JP'),
   KZ: makeCountry('KZ'),

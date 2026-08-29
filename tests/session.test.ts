@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CONFIG } from '../src/config.js';
+import { CONFIG, DEFAULT_MAP } from '../src/config.js';
 import { BotDb } from '../src/db.js';
 import type { IGeocoder } from '../src/geocode.js';
 import type { GameState, IGeoGuessrClient, RoundInfo } from '../src/geoguessr.js';
@@ -191,6 +191,40 @@ describe('GameSession', () => {
     expect(top).toHaveLength(1);
     expect(top[0].number).toBe(1);
     expect(top[0].endTs).not.toBeNull();
+  });
+
+  it.each([
+    [10, 'f'],
+    [20, 'ooof'],
+  ])('reports %s-streak losses with %s', async (streak, reaction) => {
+    const session = makeSession(db, collected);
+    await session.startNewGame();
+    session.setStreak(streak);
+    session.registerVote('u1', 'germany');
+    await vi.advanceTimersByTimeAsync(CONFIG.voteWindowMs + 1);
+
+    expect(collected.resolved).toHaveLength(1);
+    expect(collected.resolved[0].endedStreak).toBe(streak);
+    expect(collected.resolved[0].streakLossReaction).toBe(reaction);
+  });
+
+  it.each([
+    [5, 5, true, false],
+    [5, 4, false, true],
+  ])('reports top-one record progress from a streak of %s against record %s', async (record, current, isRecord, isNear) => {
+    const historicStreak = db.startStreak('historic', DEFAULT_MAP.id, DEFAULT_MAP.name);
+    db.setStreakNumber(historicStreak, record);
+    db.endStreak(historicStreak);
+
+    const session = makeSession(db, collected);
+    await session.startNewGame();
+    session.setStreak(current);
+    session.registerVote('u1', 'france');
+    await vi.advanceTimersByTimeAsync(CONFIG.voteWindowMs + 1);
+
+    expect(collected.resolved).toHaveLength(1);
+    expect(collected.resolved[0].topOneRecord).toBe(isRecord || undefined);
+    expect(collected.resolved[0].nearTopOne).toBe(isNear || undefined);
   });
 
   it('!time extends the window and is capped at the configured maximum', async () => {

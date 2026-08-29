@@ -54,6 +54,16 @@ function makeChannelEvents(channel: SendableChannels): SessionEvents {
         embeds: [resultEmbed(info)],
         files: mapBuffer ? [new AttachmentBuilder(mapBuffer, { name: 'result-map.png' })] : [],
       });
+      if (info.streakLossReaction) await channel.send(info.streakLossReaction);
+      if (info.topOneRecord) {
+        await channel.send(`👑 **New #1 record!** This is now the highest streak on **${info.mapName}**.`);
+      } else if (info.nearTopOne) {
+        await channel.send('🔥 **One more correct answer** and this streak takes the #1 record!');
+      } else if (info.topThreeRank) {
+        await channel.send(`🏆 **Top 3 record!** This streak entered the top 3 on **${info.mapName}**.`);
+      } else if (info.nearTopThree) {
+        await channel.send('👀 **One more correct answer** and this streak enters the top 3!');
+      }
     },
     error: async (info) => {
       await channel.send(`⚠️ ${info.message}`);

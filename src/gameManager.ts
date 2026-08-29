@@ -49,6 +49,7 @@ export interface RoundResolvedInfo {
   isCorrect: boolean;
   skipped: boolean;
   mode: AnswerMode;
+  mapName: string;
   actualName: string | null;
   actualCode: string | null;
   actualCountryName: string | null;
@@ -61,7 +62,17 @@ export interface RoundResolvedInfo {
   streak: number;
   /** Streak before this round (meaningful when it reset). */
   endedStreak: number;
+  /** Short reaction posted separately when a long streak ends on an incorrect vote. */
+  streakLossReaction?: 'f' | 'ooof';
   milestone: boolean;
+  /** True when this streak exceeds every previous streak on its current map. */
+  topOneRecord?: boolean;
+  /** True when one more correct answer would exceed the current map record. */
+  nearTopOne?: boolean;
+  /** Top-three position earned by this streak on its current map. */
+  topThreeRank?: number;
+  /** True when one more correct answer would put this streak in the map's top three. */
+  nearTopThree?: boolean;
   /** Users who guessed the optional subdivision correctly in country mode. */
   subdivisionBonusUsers?: string[];
   awards: ReadonlyMap<string, number>;
@@ -418,6 +429,10 @@ export class GameSession {
     const endedStreak = this.streak;
     const roundStreakId = this.streakId;
     let milestone = false;
+    let topOneRecord = false;
+    let nearTopOne = false;
+    let topThreeRank: number | undefined;
+    let nearTopThree = false;
 
     if (isCorrect) {
       if (this.streakId === null) {
@@ -427,6 +442,18 @@ export class GameSession {
       }
       this.streak = this.deps.db.bumpStreak(this.streakId);
       milestone = CONFIG.xp.milestones.includes(this.streak);
+      const otherTopStreaks = this.deps.db.topStreaks(3, this.mapId)
+        .filter((streak) => streak.id !== this.streakId);
+      const topOneThreshold = otherTopStreaks[0]?.number;
+      const topThreeThreshold = otherTopStreaks[2]?.number;
+      const rank = otherTopStreaks.filter((streak) => streak.number > this.streak).length + 1;
+      topOneRecord = otherTopStreaks.length === 0 || this.streak > (topOneThreshold ?? 0);
+      nearTopOne = !topOneRecord && this.streak >= (topOneThreshold ?? Infinity);
+      if (!topOneRecord && (otherTopStreaks.length < 3 || this.streak > (topThreeThreshold ?? 0))) {
+        topThreeRank = rank;
+      } else if (!nearTopOne && this.streak >= (topThreeThreshold ?? Infinity)) {
+        nearTopThree = true;
+      }
     } else {
       if (this.streakId !== null) this.deps.db.endStreak(this.streakId);
       this.streak = 0;
@@ -499,6 +526,7 @@ export class GameSession {
       isCorrect,
       skipped: false,
       mode: this.mode,
+      mapName: this.mapName,
       actualName: actualAnswerName,
       actualCode: actualAnswerCode,
       actualCountryName: actual?.name ?? null,
@@ -509,7 +537,12 @@ export class GameSession {
       tally,
       streak: this.streak,
       endedStreak,
+      streakLossReaction: endedStreak >= 20 ? 'ooof' : endedStreak >= 10 ? 'f' : undefined,
       milestone,
+      topOneRecord: topOneRecord || undefined,
+      nearTopOne: nearTopOne || undefined,
+      topThreeRank,
+      nearTopThree,
       subdivisionBonusUsers: subdivisionCorrectUsers.size > 0 ? [...subdivisionCorrectUsers] : undefined,
       awards,
       mapsLink: roundMapsLink(this.current),
@@ -560,6 +593,7 @@ export class GameSession {
       isCorrect: false,
       skipped: true,
       mode: this.mode,
+      mapName: this.mapName,
       actualName: actualAnswerName,
       actualCode: actualAnswerCode,
       actualCountryName: actual?.name ?? null,

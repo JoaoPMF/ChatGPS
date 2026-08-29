@@ -115,6 +115,13 @@ describe('subdivision names and aliases', () => {
     expect(resolveSubdivision('MX', 'tamaulipas')?.code).toBe('TAM');
   });
 
+  it('uses Indonesian provinces instead of obsolete island-group subdivisions', () => {
+    expect(resolveSubdivision('ID', 'jawa barat')?.code).toBe('JB');
+    expect(resolveSubdivision('ID', 'sumatera utara')?.code).toBe('SU');
+    expect(resolveSubdivision('ID', 'jawa')).toBeNull();
+    expect(resolveSubdivision('ID', 'sumatera')).toBeNull();
+  });
+
   it.each([
     ['AU', 'cx', 'CX'], ['CL', 'ñub', 'NB'], ['IN', 'dh', 'DH'], ['ID', 'pbd', 'PD'],
     ['KZ', 'ul', 'ULY'], ['PH', 'neg', '18'], ['US', 'bye', 'HI'], ['RU', 'spb', 'SPE'],
@@ -126,6 +133,10 @@ describe('subdivision names and aliases', () => {
     ['ES', 'castelhao', 'CS'],
     ['ES', 'madri', 'M'],
     ['ES', 'valhadoli', 'VA'],
+    ['DE', 'bw', 'BW'],
+    ['DE', 'nrw', 'NW'],
+    ['DE', 'mecklenburg vorpommern', 'MV'],
+    ['DE', 'thüringen', 'TH'],
   ])('resolves requested aliases for %s', (countryCode, subdivision, expectedCode) => {
     expect(resolveSubdivision(countryCode, subdivision)?.code).toBe(expectedCode);
   });
